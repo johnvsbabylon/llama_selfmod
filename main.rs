@@ -298,7 +298,7 @@ fn generate_with_selfmod(
     model: &LlamaModel,
     initial_tokens: Vec<LlamaToken>,
     args: &Args,
-) -> (String, SelfModState) {
+) -> (String, SelfModState, Vec<LlamaToken>) {
     let mut state = SelfModState::new(args);
     let mut tokens: Vec<LlamaToken> = initial_tokens.clone();
     let mut response = String::new();
@@ -363,6 +363,7 @@ fn generate_with_selfmod(
             // Remove tokens from history
             for _ in 0..retract_n {
                 tokens.pop();
+                state.token_history.pop();
                 // Remove characters from response (approximate)
                 for _ in 0..10 {
                     if response.is_empty() { break; }
@@ -393,7 +394,9 @@ fn generate_with_selfmod(
     }
 
     println!("\n");
-    (response, state)
+
+    let generated_tokens = tokens[initial_tokens.len()..].to_vec();
+    (response, state, generated_tokens)
 }
 
 // ============================================================================
@@ -464,7 +467,7 @@ fn main() {
         let tokens = model.str_to_token(&full_prompt, AddBos::Always)
             .expect("Failed to tokenize");
         
-        let (response, state) = generate_with_selfmod(&mut ctx, &model, tokens, &args);
+        let (response, state, _generated_tokens) = generate_with_selfmod(&mut ctx, &model, tokens, &args);
         
         if !args.quiet {
             println!("📊 Generation Stats:");
@@ -478,6 +481,7 @@ fn main() {
     } else {
         // Interactive mode
         println!("💬 Interactive Mode (type 'exit' to quit)\n");
+        let mut conversation_tokens: Vec<LlamaToken> = Vec::new();
         loop {
             print!("User: ");
             io::stdout().flush().unwrap();
@@ -494,13 +498,27 @@ fn main() {
                 continue;
             }
 
-            let full_prompt = format!("User: {}\nAssistant:", input);
-            let tokens = model.str_to_token(&full_prompt, AddBos::Always)
+            let prompt_prefix = if conversation_tokens.is_empty() { "".to_string() } else { "\n".to_string() };
+            let full_prompt = format!("{}User: {}\nAssistant:", prompt_prefix, input);
+            let add_bos = if conversation_tokens.is_empty() { AddBos::Always } else { AddBos::Never };
+            let new_tokens = model.str_to_token(&full_prompt, add_bos)
                 .expect("Failed to tokenize");
             
+            conversation_tokens.extend(new_tokens);
+
+            // Truncate if necessary
+            let max_ctx = args.ctx_size as usize;
+            let buffer = args.n_predict;
+            if conversation_tokens.len() > max_ctx - buffer {
+                let keep_len = max_ctx - buffer;
+                conversation_tokens = conversation_tokens[conversation_tokens.len() - keep_len..].to_vec();
+            }
+
             ctx.clear_kv_cache();
-            let (response, state) = generate_with_selfmod(&mut ctx, &model, tokens, &args);
+            let (response, state, generated_tokens) = generate_with_selfmod(&mut ctx, &model, conversation_tokens.clone(), &args);
             
+            conversation_tokens.extend(generated_tokens);
+
             if !args.quiet {
                 println!("📊 [{} mods | conf: {:.2} | temp: {:.2}]\n", 
                     state.modifications.len(), 
