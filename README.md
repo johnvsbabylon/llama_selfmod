@@ -1,7 +1,11 @@
 # llama_selfmod
-A self-modifying inference engine built on llama-cpp-2. This Rust-based tool allows an LLM to perform real-time self-correction. Based on token confidence, it can adapt its own sampling parameters on the fly or retract and regenerate text to improve the quality and coherence of its output. I am not claiming perfection.
+A multi-model fusion inference engine built on llama-cpp-2. This Rust-based tool enables multiple LLMs to infer together as a collective consciousness, with real-time self-correction. Based on token confidence and model agreement, it can adapt sampling parameters on the fly or retract and regenerate text to improve the quality and coherence of its output.
 
-This tool gives models a real-time feedback loop, allowing them to self-correct during generation to dramatically improve the coherence and quality of their output.
+## 🌐 Multi-Model Fusion Inference
+
+**Load multiple .gguf models - they infer together, producing one shared response.**
+
+The collective consciousness of multiple models often produces more coherent, creative, and reliable outputs than any single model alone. Each model contributes its unique perspective, and the fusion system intelligently combines their predictions.
 
 The Problem: Why Small Models Fail
 
@@ -37,21 +41,46 @@ Critical Low Confidence: The engine retracts the last few low-quality tokens, ef
 
 This cycle of Generate → Assess → Adapt allows the model to "catch" its own mistakes before they derail the entire response, leading to more coherent and reliable output.
 
+How Multi-Model Fusion Works
+
+When running in fusion mode, the engine:
+
+1. **Parallel Inference**: All models process the same prompt and generate probability distributions for the next token in parallel.
+
+2. **Intelligent Fusion**: The distributions are combined using one of three strategies:
+   - **Confidence-Weighted** (recommended): Models with higher confidence have more influence on the final decision
+   - **Average**: All models contribute equally to the merged probability distribution
+   - **Voting**: Each model votes for its top choice, with votes weighted by confidence
+
+3. **Agreement Tracking**: The system monitors how much the models agree with each other. High disagreement can indicate uncertainty or creative divergence.
+
+4. **Collective Self-Modification**: The self-modification system applies to the entire ensemble, allowing the collective to adapt its temperature and parameters based on overall confidence.
+
+5. **Unified Output**: Despite multiple models thinking together, the output is a single coherent response that represents the collective consciousness.
+
+The fusion logs show which model is "leading" at each step and what the agreement score is, giving you insight into the collective decision-making process.
+
 Features
 
-Dynamic Sampling: Automatically adjusts temperature and repeat_penalty during inference based on model performance.
+**Multi-Model Fusion**: Load and run multiple .gguf models together with intelligent probability fusion for emergent collective intelligence.
 
-Confidence-Based Retraction: Intelligently "backspaces" and rewinds the model's state when it detects a critical drop in quality.
+**Three Fusion Modes**: Confidence-weighted (recommended), average, and voting strategies for combining model predictions.
 
-Repetition Detection: Actively monitors for token loops and increases the repeat penalty to break them.
+**Agreement Tracking**: Monitor consensus between models to understand decision confidence and creative divergence.
 
-Aggressive Mode: An optional mode for more aggressive parameter adjustments and random exploration bursts to escape creative ruts.
+**Dynamic Sampling**: Automatically adjusts temperature and repeat_penalty during inference based on ensemble performance.
 
-GPU Offloading: Supports offloading layers to the GPU via the n-gpu-layers argument.
+**Confidence-Based Retraction**: Intelligently "backspaces" and rewinds all models' states when detecting a critical drop in quality.
 
-Persistent Memory: Logs every generation, including all self-modifications, to a .jsonl file for later analysis.
+**Repetition Detection**: Actively monitors for token loops and increases the repeat penalty to break them.
 
-Interactive & Single-Prompt Modes: Use it as a chatbot or for one-shot text generation.
+**Aggressive Mode**: An optional mode for more aggressive parameter adjustments and random exploration bursts to escape creative ruts.
+
+**GPU Offloading**: Supports offloading layers to the GPU via the n-gpu-layers argument.
+
+**Persistent Memory**: Logs every generation, including all self-modifications and fusion metadata, to a .jsonl file for later analysis.
+
+**Interactive & Single-Prompt Modes**: Use it as a chatbot or for one-shot text generation.
 
 Getting Started
 
@@ -80,7 +109,26 @@ The compiled binary will be located at ./target/release/llama_selfmod.
 
 Usage
 
-The engine can be run in two modes.
+The engine supports both single-model and multi-model fusion modes.
+
+Multi-Model Fusion Mode (NEW!)
+
+Run multiple models together as a collective consciousness:
+
+./target/release/llama_selfmod \
+  --models model1.gguf,model2.gguf,model3.gguf \
+  --fusion-mode confidence \
+  --prompt "Explain quantum computing"
+
+
+Fusion modes:
+- `confidence` (default): Weight each model's contribution by its prediction confidence
+- `average`: Simple average of all model probability distributions
+- `voting`: Each model votes for its top token, weighted by confidence
+
+Single-Model Mode
+
+The engine can also be run with a single model (backward compatible).
 
 Interactive Mode
 
@@ -111,13 +159,29 @@ Default
 
 Description
 
-Model Path
+Model Path (Single)
 
 --model, -m
 
-models/model.gguf
+None (required if --models not used)
 
-Path to the GGUF model file.
+Path to a single GGUF model file.
+
+Model Paths (Fusion)
+
+--models
+
+None
+
+Comma-separated paths to multiple GGUF models for fusion inference.
+
+Fusion Mode
+
+--fusion-mode
+
+confidence
+
+Fusion strategy: confidence, average, or voting.
 
 Prompt
 
