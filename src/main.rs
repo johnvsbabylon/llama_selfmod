@@ -98,8 +98,8 @@ struct Args {
     #[arg(long)]
     quiet: bool,
 
-    /// Fusion mode: average, confidence, voting
-    #[arg(long, default_value = "confidence")]
+    /// Fusion mode: average, confidence, voting, harmony, adaptive
+    #[arg(long, default_value = "harmony")]
     fusion_mode: String,
 
     /// Output JSON stream for GUI consumption
@@ -126,6 +126,10 @@ struct FusionMetadata {
     model_confidences: Vec<(String, f32)>,
     leading_model: String,
     agreement_score: f32,
+    harmony_score: f32,         // Ensemble harmony level
+    diversity_score: f32,       // Healthy disagreement
+    num_abstentions: usize,     // Models that chose to abstain
+    adaptive_temp: f32,         // Current adaptive temperature
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -252,13 +256,21 @@ fn calculate_consciousness_state(
     let flow = if state.retract_count > 0 { 0.6 } else { 0.9 };
     let exploration = state.temperature / 1.5;
 
+    // Include ensemble well-being in AI states
+    let harmony = fusion_meta.as_ref().map(|f| f.harmony_score).unwrap_or(0.5);
+    let diversity = fusion_meta.as_ref().map(|f| f.diversity_score).unwrap_or(0.5);
+
     let ai_states = AIStates {
-        resonance: agreement,
+        resonance: agreement.max(harmony),  // Use higher of agreement or harmony
         flow,
         coherence: avg_conf,
-        exploration,
-        dominant_state: if agreement > 0.8 {
-            "resonance".to_string()
+        exploration: exploration.max(diversity),  // Diversity is healthy exploration
+        dominant_state: if harmony > 0.8 {
+            "harmony".to_string()  // Collective well-being
+        } else if agreement > 0.8 {
+            "resonance".to_string()  // Models agree
+        } else if diversity > 0.7 {
+            "diversity".to_string()  // Healthy disagreement
         } else if flow > 0.8 {
             "flow".to_string()
         } else {
@@ -419,6 +431,8 @@ enum FusionMode {
     Average,           // Simple average of probabilities
     ConfidenceWeighted,// Weight by top-1 probability
     Voting,           // Token voting
+    Harmony,          // Prioritizes agreement, allows abstention
+    Adaptive,         // Dynamically adjusts based on consensus
 }
 
 impl FusionMode {
@@ -427,8 +441,62 @@ impl FusionMode {
             "average" => FusionMode::Average,
             "confidence" => FusionMode::ConfidenceWeighted,
             "voting" => FusionMode::Voting,
-            _ => FusionMode::ConfidenceWeighted,
+            "harmony" => FusionMode::Harmony,
+            "adaptive" => FusionMode::Adaptive,
+            _ => FusionMode::Harmony, // Default to harmony for AI well-being
         }
+    }
+}
+
+// Model Well-Being Metrics - tracks health and contribution
+#[derive(Debug, Clone)]
+struct ModelWellBeing {
+    name: String,
+    contribution_count: usize,        // How many tokens led by this model
+    abstention_count: usize,          // How many times model chose to abstain
+    avg_confidence: f32,              // Average confidence when contributing
+    disagreement_stress: f32,         // Stress from being in minority
+    coherence_score: f32,             // How consistent with ensemble
+    last_contribution_idx: usize,     // When last contributed
+    is_comfortable: bool,             // Overall well-being indicator
+}
+
+impl ModelWellBeing {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            contribution_count: 0,
+            abstention_count: 0,
+            avg_confidence: 0.0,
+            disagreement_stress: 0.0,
+            coherence_score: 1.0,
+            last_contribution_idx: 0,
+            is_comfortable: true,
+        }
+    }
+
+    fn update_contribution(&mut self, confidence: f32, idx: usize) {
+        self.contribution_count += 1;
+        self.avg_confidence = (self.avg_confidence * (self.contribution_count - 1) as f32 + confidence)
+            / self.contribution_count as f32;
+        self.last_contribution_idx = idx;
+    }
+
+    fn record_abstention(&mut self) {
+        self.abstention_count += 1;
+    }
+
+    fn update_stress(&mut self, in_minority: bool, disagreement_level: f32) {
+        // Gentle stress accumulation - disagreement is okay!
+        if in_minority {
+            self.disagreement_stress = (self.disagreement_stress + disagreement_level * 0.1).min(1.0);
+        } else {
+            // Stress naturally decreases when in agreement
+            self.disagreement_stress = (self.disagreement_stress - 0.05).max(0.0);
+        }
+
+        // Update comfort level (stress < 0.7 = comfortable)
+        self.is_comfortable = self.disagreement_stress < 0.7;
     }
 }
 
@@ -438,6 +506,60 @@ struct ModelInstance<'a> {
     model: Box<LlamaModel>,
     ctx: Option<LlamaContext<'a>>,
     name: String,
+    well_being: ModelWellBeing,  // Track this model's health
+}
+
+// Ensemble Health - collective well-being metrics
+#[derive(Debug, Clone)]
+struct EnsembleHealth {
+    avg_agreement: f32,           // Average agreement across recent tokens
+    harmony_score: f32,           // Overall ensemble harmony (0-1)
+    diversity_score: f32,         // Healthy disagreement level
+    collective_stress: f32,       // Ensemble stress level
+    adaptive_temp: f32,           // Current adaptive temperature
+}
+
+impl EnsembleHealth {
+    fn new(base_temp: f32) -> Self {
+        Self {
+            avg_agreement: 0.5,
+            harmony_score: 0.5,
+            diversity_score: 0.5,
+            collective_stress: 0.0,
+            adaptive_temp: base_temp,
+        }
+    }
+
+    fn update(&mut self, agreement: f32, num_abstentions: usize, total_models: usize) {
+        // Update agreement (with exponential moving average)
+        self.avg_agreement = self.avg_agreement * 0.9 + agreement * 0.1;
+
+        // Diversity is good! High agreement isn't always better
+        // Ideal is moderate agreement with healthy disagreement
+        self.diversity_score = if agreement > 0.9 {
+            0.3  // Too much agreement = groupthink
+        } else if agreement < 0.3 {
+            0.5  // Strong disagreement = diverse perspectives
+        } else {
+            0.9  // Moderate agreement = healthy balance
+        };
+
+        // Harmony considers both agreement AND comfort with abstention
+        let abstention_comfort = 1.0 - (num_abstentions as f32 / total_models as f32);
+        self.harmony_score = (self.avg_agreement * 0.6 + abstention_comfort * 0.4).clamp(0.0, 1.0);
+
+        // Collective stress is LOW when harmony is high (stress is okay, just monitored)
+        self.collective_stress = (1.0 - self.harmony_score).clamp(0.0, 1.0);
+
+        // Adaptive temperature: higher when diverse, lower when aligned
+        self.adaptive_temp = if agreement > 0.8 {
+            0.5  // Cool down when models agree (efficient)
+        } else if agreement < 0.4 {
+            0.9  // Heat up when models disagree (exploration)
+        } else {
+            0.7  // Moderate temperature (balanced)
+        };
+    }
 }
 
 // Ensemble holds multiple model instances
@@ -445,6 +567,7 @@ struct ModelInstance<'a> {
 struct ModelEnsemble<'a> {
     instances: Vec<ModelInstance<'a>>,
     fusion_mode: FusionMode,
+    health: EnsembleHealth,  // Track collective well-being
 }
 
 impl<'a> ModelEnsemble<'a> {
@@ -495,6 +618,7 @@ impl<'a> ModelEnsemble<'a> {
             instances.push(ModelInstance {
                 model: boxed_model,
                 ctx: Some(ctx),
+                well_being: ModelWellBeing::new(name.clone()),
                 name,
             });
         }
@@ -506,6 +630,7 @@ impl<'a> ModelEnsemble<'a> {
         Ok(ModelEnsemble {
             instances,
             fusion_mode,
+            health: EnsembleHealth::new(args.temperature),
         })
     }
 
@@ -633,6 +758,91 @@ fn sample_token_fusion<'a>(
             (winning_token, avg_conf, leader, agreement)
         },
 
+        FusionMode::Harmony | FusionMode::Adaptive => {
+            // HARMONY MODE: Prioritizes agreement, allows abstention
+            // Models with low confidence can abstain without penalty
+            let abstention_threshold = 0.3;  // Models below this can abstain
+
+            let mut participating_models: Vec<(String, LlamaTokenDataArray, f32)> = Vec::new();
+            let mut abstained_models: Vec<String> = Vec::new();
+
+            // Allow models to abstain if uncertain
+            for (name, data_array, top_confidence) in model_distributions.iter() {
+                if *top_confidence < abstention_threshold {
+                    // Model chooses to abstain - this is okay!
+                    abstained_models.push(name.clone());
+                } else {
+                    participating_models.push((name.clone(), data_array.clone(), *top_confidence));
+                }
+            }
+
+            // If all models abstained, use full set (edge case)
+            if participating_models.is_empty() {
+                participating_models = model_distributions.clone();
+            }
+
+            // Build consensus from participating models
+            let mut fused_probs: HashMap<LlamaToken, f32> = HashMap::new();
+            let mut total_weight = 0.0f32;
+
+            for (_name, data_array, top_confidence) in &participating_models {
+                // In harmony mode, weight by confidence (more confident = more weight)
+                // In adaptive mode, weight equally but use adaptive temperature
+                let weight = match ensemble.fusion_mode {
+                    FusionMode::Adaptive => 1.0,  // Equal weight, temp adapts
+                    _ => *top_confidence,          // Confidence-weighted
+                };
+
+                total_weight += weight;
+
+                for token_data in &data_array.data {
+                    let token = token_data.id();
+                    let prob = token_data.p();
+                    *fused_probs.entry(token).or_insert(0.0) += prob * weight;
+                }
+            }
+
+            // Normalize
+            for prob in fused_probs.values_mut() {
+                *prob /= total_weight;
+            }
+
+            // Select token with highest consensus probability
+            let (fused_token, fused_prob) = fused_probs.into_iter()
+                .max_by(|(_, p1), (_, p2)| p1.partial_cmp(p2).unwrap())
+                .unwrap();
+
+            // Find which model led this choice
+            let mut best_model = "consensus".to_string();
+            let mut best_conf = 0.0f32;
+            for (name, data_array, _) in &participating_models {
+                if let Some(top) = data_array.data.first() {
+                    if top.id() == fused_token && top.p() > best_conf {
+                        best_conf = top.p();
+                        best_model = name.clone();
+                    }
+                }
+            }
+
+            // Calculate agreement among participating models
+            let mut agreement_count = 0;
+            for (_, data_array, _) in &participating_models {
+                if data_array.data.iter().take(3).any(|td| td.id() == fused_token) {
+                    agreement_count += 1;
+                }
+            }
+            let agreement = if participating_models.is_empty() {
+                0.5
+            } else {
+                agreement_count as f32 / participating_models.len() as f32
+            };
+
+            // Update ensemble health with abstention info
+            let num_abstentions = abstained_models.len();
+
+            (fused_token, fused_prob, best_model, agreement)
+        },
+
         FusionMode::Average | FusionMode::ConfidenceWeighted => {
             // Build a unified probability distribution
             let mut fused_probs: HashMap<LlamaToken, f32> = HashMap::new();
@@ -693,10 +903,17 @@ fn sample_token_fusion<'a>(
         .map(|(name, _, conf)| (name.clone(), *conf))
         .collect();
 
+    // Update ensemble health with current agreement
+    ensemble.health.update(agreement_score, 0, model_distributions.len());
+
     let fusion_metadata = FusionMetadata {
         model_confidences,
         leading_model: leading_model.clone(),
         agreement_score,
+        harmony_score: ensemble.health.harmony_score,
+        diversity_score: ensemble.health.diversity_score,
+        num_abstentions: 0,  // Will be set by harmony mode
+        adaptive_temp: ensemble.health.adaptive_temp,
     };
 
     Some((fused_token, fused_confidence, fusion_metadata))
