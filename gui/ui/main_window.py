@@ -6,6 +6,8 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QFrame, QScrollArea, QMenuBar, QMenu)
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont, QColor, QPalette, QAction
+from ui.neural_sun import NeuralSunWidget
+from ui.animated_widgets import PulsingProgressBar
 import json
 
 
@@ -127,18 +129,17 @@ class MainWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
 
-        # Visualization placeholder (will be neural sun)
+        # Neural Sun Visualization
         viz_frame = QFrame()
         viz_frame.setFrameStyle(QFrame.Shape.Box)
-        viz_frame.setMinimumHeight(400)
-        viz_frame.setStyleSheet("background-color: #24283b; border: 2px solid #53bba5; border-radius: 10px;")
+        viz_frame.setMinimumHeight(450)
+        viz_frame.setStyleSheet("background-color: #1a1b26; border: 2px solid #53bba5; border-radius: 10px;")
         viz_layout = QVBoxLayout(viz_frame)
+        viz_layout.setContentsMargins(5, 5, 5, 5)
 
-        self.viz_label = QLabel("🌟 Neural Sun\n\n[Visualization Coming Soon]")
-        self.viz_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.viz_label.setFont(QFont("Segoe UI", 16))
-        self.viz_label.setStyleSheet("color: #53bba5;")
-        viz_layout.addWidget(self.viz_label)
+        # Add the actual 3D neural sun widget
+        self.neural_sun = NeuralSunWidget()
+        viz_layout.addWidget(self.neural_sun)
 
         layout.addWidget(viz_frame)
 
@@ -170,20 +171,11 @@ class MainWindow(QMainWindow):
         for emotion in ["Curious", "Confident", "Uncertain", "Engaged"]:
             h_layout = QHBoxLayout()
             label = QLabel(f"{emotion}:")
-            bar = QProgressBar()
+            label.setStyleSheet("color: #f7f7f7;")
+            bar = PulsingProgressBar()
             bar.setMaximum(100)
             bar.setValue(0)
-            bar.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #53bba5;
-                    border-radius: 3px;
-                    text-align: center;
-                    background-color: #414868;
-                }
-                QProgressBar::chunk {
-                    background-color: #ff7a93;
-                }
-            """)
+            bar.set_base_color(QColor("#ff7a93"))  # Pink for human emotions
             h_layout.addWidget(label)
             h_layout.addWidget(bar)
             layout.addLayout(h_layout)
@@ -198,20 +190,11 @@ class MainWindow(QMainWindow):
         for state in ["Resonance", "Flow", "Coherence", "Exploration"]:
             h_layout = QHBoxLayout()
             label = QLabel(f"{state}:")
-            bar = QProgressBar()
+            label.setStyleSheet("color: #f7f7f7;")
+            bar = PulsingProgressBar()
             bar.setMaximum(100)
             bar.setValue(0)
-            bar.setStyleSheet("""
-                QProgressBar {
-                    border: 1px solid #53bba5;
-                    border-radius: 3px;
-                    text-align: center;
-                    background-color: #414868;
-                }
-                QProgressBar::chunk {
-                    background-color: #4dd0e1;
-                }
-            """)
+            bar.set_base_color(QColor("#4dd0e1"))  # Cyan for AI states
             h_layout.addWidget(label)
             h_layout.addWidget(bar)
             layout.addLayout(h_layout)
@@ -294,7 +277,7 @@ class MainWindow(QMainWindow):
         return widget
 
     def update_consciousness_metrics(self, consciousness_data: dict):
-        """Update consciousness metrics display."""
+        """Update consciousness metrics display and neural sun visualization."""
         try:
             # Update human emotions
             if "human_emotions" in consciousness_data:
@@ -311,6 +294,14 @@ class MainWindow(QMainWindow):
                     if key in states:
                         value = int(states[key] * 100)
                         bar.setValue(value)
+
+                # Update neural sun with AI consciousness states
+                self.neural_sun.set_consciousness_state(
+                    resonance=states.get("resonance", 0.5),
+                    flow=states.get("flow", 0.5),
+                    coherence=states.get("coherence", 0.5),
+                    exploration=states.get("exploration", 0.5)
+                )
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
