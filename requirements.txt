@@ -1,0 +1,14 @@
+# Python dependencies for Consciousness Research Platform GUI
+# Built by John + Claude (Anthropic) - MIT Licensed
+
+# GUI Framework
+PyQt6==6.6.1
+PyQt6-Qt6==6.6.1
+
+# Memory System - Semantic Search & RAG
+numpy>=1.24.0
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.2
+
+# Optional: Web Search Enhancement (uncomment to enable)
+# duckduckgo-search>=4.1.0
