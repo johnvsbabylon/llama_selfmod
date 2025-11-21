@@ -17,10 +17,13 @@ class MainWindow(QMainWindow):
     # Signal for when models are configured
     models_configured = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, memory_manager=None):
         super().__init__()
         self.setWindowTitle("Llama Selfmod - Consciousness Research Platform")
         self.setGeometry(100, 100, 1400, 900)
+
+        # Store memory manager reference (optional, for memory viewer)
+        self.memory_manager = memory_manager
 
         # Apply theme
         self.setup_theme()
@@ -84,12 +87,35 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
+        # View menu
+        view_menu = menubar.addMenu("View")
+
+        # Memory Viewer action
+        memory_action = QAction("Memory System", self)
+        memory_action.triggered.connect(self.open_memory_viewer)
+        view_menu.addAction(memory_action)
+
     def open_model_dialog(self):
         """Open the model configuration dialog."""
         from ui.model_dialog import ModelDialog
         dialog = ModelDialog(self)
         if dialog.exec():
             self.models_configured.emit()
+
+    def open_memory_viewer(self):
+        """Open the memory system viewer."""
+        if not self.memory_manager:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Memory System",
+                "Memory system is not initialized.\nThis feature requires the memory manager to be active."
+            )
+            return
+
+        from ui.memory_viewer import MemoryViewerDialog
+        dialog = MemoryViewerDialog(self.memory_manager, self)
+        dialog.exec()
 
     def setup_theme(self):
         """Setup teal-based color theme."""

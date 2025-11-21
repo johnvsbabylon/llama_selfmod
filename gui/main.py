@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from ui.main_window import MainWindow
 from orchestrator.rust_bridge import RustBridge
+from memory.memory_manager import MemoryManager
 
 
 class InferenceWorker(QThread):
@@ -75,15 +76,31 @@ class ConsciousnessPlatform:
 
     def __init__(self):
         self.app = QApplication(sys.argv)
-        self.window = MainWindow()
+
+        # Initialize memory system first
+        print("Initializing memory system...")
+        self.memory = MemoryManager(auto_save=True)
+
+        # Create window with memory manager reference
+        self.window = MainWindow(memory_manager=self.memory)
         self.bridge = RustBridge()
         self.worker = None
+
+        # Track current AI response for accumulation
+        self.current_ai_response = ""
+        self.current_consciousness_states = []
 
         # Connect signals
         self.window.send_button.clicked.connect(self.on_send_clicked)
 
+        # Connect app quit to save memory
+        self.app.aboutToQuit.connect(self.on_app_quit)
+
         # Check if Rust binary exists
         self.check_rust_binary()
+
+        # Start memory session
+        self.memory.start_session(title="Consciousness Research Session")
 
     def check_rust_binary(self):
         """Check if Rust binary is built."""
@@ -120,14 +137,30 @@ class ConsciousnessPlatform:
             )
             return
 
+        # Record user message to memory
+        self.memory.add_user_message(prompt)
+
+        # Get relevant context from memory (RAG)
+        context = self.memory.get_context_for_query(prompt, num_results=3)
+
+        # Augment prompt with context if available
+        if context.strip():
+            augmented_prompt = f"{context}\n\nCurrent Query: {prompt}"
+        else:
+            augmented_prompt = prompt
+
         # Clear input
         self.window.input_text.clear()
 
-        # Add user message
+        # Add user message to chat
         self.window.add_message("user", prompt)
 
+        # Reset AI response accumulator
+        self.current_ai_response = ""
+        self.current_consciousness_states = []
+
         # Start inference in background
-        self.start_inference(models, prompt)
+        self.start_inference(models, augmented_prompt)
 
     def load_configured_models(self) -> list:
         """Load model paths from configuration file."""
@@ -188,6 +221,9 @@ class ConsciousnessPlatform:
         fusion_mode = event.get("fusion_mode", "unknown")
         self.window.set_status(f"Generating with {num_models} models ({fusion_mode})...", "#53bba5")
 
+        # Update neural sun with model count
+        self.window.neural_sun.set_num_models(num_models)
+
         # Start AI message
         self.window.add_message("ai", "")
 
@@ -195,6 +231,10 @@ class ConsciousnessPlatform:
         """Handle token event."""
         text = event.get("text", "")
         consciousness = event.get("consciousness", {})
+
+        # Accumulate response for memory
+        self.current_ai_response += text
+        self.current_consciousness_states.append(consciousness)
 
         # Stream token to chat
         self.window.add_message("ai", text, is_streaming=True)
@@ -206,6 +246,22 @@ class ConsciousnessPlatform:
         """Handle completion event."""
         total_tokens = event.get("total_tokens", 0)
         avg_confidence = event.get("avg_confidence", 0.0)
+
+        # Calculate average consciousness state across all tokens
+        avg_consciousness = self._calculate_average_consciousness()
+
+        # Save AI response to memory
+        if self.current_ai_response.strip():
+            self.memory.add_ai_response(
+                text=self.current_ai_response,
+                token_count=total_tokens,
+                consciousness_state=avg_consciousness,
+                fusion_metadata={
+                    'avg_confidence': avg_confidence,
+                    'modifications': event.get('modifications', 0),
+                    'retractions': event.get('retractions', 0)
+                }
+            )
 
         self.window.set_status(
             f"Complete - {total_tokens} tokens, avg confidence: {avg_confidence:.2f}",
@@ -221,6 +277,58 @@ class ConsciousnessPlatform:
         QMessageDialog.critical(self.window, "Error", error_msg)
         self.window.set_status(f"Error: {error_msg}", "#ff9e64")
         self.window.set_connected(False)
+
+    def _calculate_average_consciousness(self) -> dict:
+        """
+        Calculate average consciousness state across all tokens in response.
+
+        Returns:
+            Dictionary with averaged human_emotions and ai_states
+        """
+        if not self.current_consciousness_states:
+            return {}
+
+        # Initialize accumulators
+        total_states = len(self.current_consciousness_states)
+        avg_state = {
+            'human_emotions': {'curious': 0.0, 'confident': 0.0, 'uncertain': 0.0, 'engaged': 0.0},
+            'ai_states': {'resonance': 0.0, 'flow': 0.0, 'coherence': 0.0, 'exploration': 0.0}
+        }
+
+        # Sum all states
+        for state in self.current_consciousness_states:
+            if 'human_emotions' in state:
+                for key in avg_state['human_emotions']:
+                    avg_state['human_emotions'][key] += state['human_emotions'].get(key, 0.0)
+
+            if 'ai_states' in state:
+                for key in avg_state['ai_states']:
+                    avg_state['ai_states'][key] += state['ai_states'].get(key, 0.0)
+
+        # Calculate averages
+        for key in avg_state['human_emotions']:
+            avg_state['human_emotions'][key] /= total_states
+
+        for key in avg_state['ai_states']:
+            avg_state['ai_states'][key] /= total_states
+
+        return avg_state
+
+    def on_app_quit(self):
+        """Handle application quit - save memory and cleanup."""
+        print("\nShutting down consciousness platform...")
+
+        # End current memory session
+        self.memory.end_session()
+
+        # Save memory (auto-save should handle this, but be explicit)
+        self.memory.save()
+
+        # Stop any running inference
+        if self.bridge:
+            self.bridge.stop()
+
+        print("Goodbye!")
 
     def run(self):
         """Run the application."""
