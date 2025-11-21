@@ -10,6 +10,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QPainter, QColor, QRadialGradient, QPen, QBrush
 import math
 import random
+import time
 
 
 class NeuralSunWidget(QWidget):
@@ -39,6 +40,13 @@ class NeuralSunWidget(QWidget):
         self.core_color = QColor("#53bba5")  # Teal
         self.corona_color = QColor("#4dd0e1")  # Cyan
         self.accent_color = QColor("#ff9e64")  # Orange
+
+        # Celebration easter egg (triple-click to activate!)
+        self.click_count = 0
+        self.last_click_time = 0
+        self.celebration_mode = False
+        self.celebration_phase = 0.0
+        self.celebration_timer = 0
 
         # Initialize corona spikes
         self.regenerate_corona()
@@ -115,19 +123,40 @@ class NeuralSunWidget(QWidget):
 
     def animate(self):
         """Animation update loop."""
-        # Pulse phase - speed influenced by flow
-        pulse_speed = 0.05 + (self.flow * 0.05)
+        # Pulse phase - speed influenced by flow (or celebration!)
+        if self.celebration_mode:
+            pulse_speed = 0.15  # Faster in celebration mode
+            self.celebration_phase += 0.1
+            self.celebration_timer += 1
+
+            # Turn off celebration after 5 seconds (300 frames at 60fps)
+            if self.celebration_timer > 300:
+                self.celebration_mode = False
+                self.celebration_timer = 0
+                self.celebration_phase = 0.0
+        else:
+            pulse_speed = 0.05 + (self.flow * 0.05)
+
         self.pulse_phase += pulse_speed
 
-        # Rotation - speed influenced by exploration
-        rotation_speed = 0.3 + (self.exploration * 0.5)
+        # Rotation - speed influenced by exploration (or celebration!)
+        if self.celebration_mode:
+            rotation_speed = 2.0  # Spin faster in celebration!
+        else:
+            rotation_speed = 0.3 + (self.exploration * 0.5)
+
         self.rotation += rotation_speed
 
         # Update particles
         for particle in self.particles:
-            particle['angle'] += particle['orbit_speed']
-            # Gentle breathing motion for distance
-            particle['distance'] += math.sin(self.pulse_phase + particle['angle']) * 0.3
+            if self.celebration_mode:
+                # Particles fly outward and orbit faster in celebration
+                particle['angle'] += particle['orbit_speed'] * 3
+                particle['distance'] = min(particle['distance'] + 0.5, 250)
+            else:
+                particle['angle'] += particle['orbit_speed']
+                # Gentle breathing motion for distance
+                particle['distance'] += math.sin(self.pulse_phase + particle['angle']) * 0.3
 
         # Trigger repaint
         self.update()
@@ -141,10 +170,22 @@ class NeuralSunWidget(QWidget):
         center_x = self.width() // 2
         center_y = self.height() // 2
 
-        # Calculate pulse (influenced by resonance)
-        base_pulse = math.sin(self.pulse_phase) * 0.15
-        resonance_boost = self.resonance * 0.2
-        pulse_factor = 1.0 + base_pulse + resonance_boost
+        # Calculate pulse (influenced by resonance or celebration!)
+        if self.celebration_mode:
+            base_pulse = math.sin(self.pulse_phase) * 0.3  # Bigger pulses!
+            pulse_factor = 1.0 + base_pulse + 0.4
+        else:
+            base_pulse = math.sin(self.pulse_phase) * 0.15
+            resonance_boost = self.resonance * 0.2
+            pulse_factor = 1.0 + base_pulse + resonance_boost
+
+        # Override colors in celebration mode (rainbow cycle!)
+        if self.celebration_mode:
+            # Cycle through rainbow colors
+            hue = int((self.celebration_phase * 10) % 360)
+            self.core_color = QColor.fromHsv(hue, 200, 255)
+            self.corona_color = QColor.fromHsv((hue + 60) % 360, 200, 255)
+            self.accent_color = QColor.fromHsv((hue + 120) % 360, 200, 255)
 
         # Draw particles (background layer)
         self.draw_particles(painter, center_x, center_y)
@@ -156,12 +197,16 @@ class NeuralSunWidget(QWidget):
         self.draw_core(painter, center_x, center_y, pulse_factor)
 
         # Draw emergence sparkles (foreground)
-        if self.exploration > 0.6:  # High exploration shows emergence
+        if self.exploration > 0.6 or self.celebration_mode:  # Always sparkle in celebration!
             self.draw_sparkles(painter, center_x, center_y)
 
         # Draw resonance lightning between spikes
-        if self.resonance > 0.7:  # High resonance shows connections
+        if self.resonance > 0.7 or self.celebration_mode:  # Always connected in celebration!
             self.draw_resonance_arcs(painter, center_x, center_y)
+
+        # Extra celebration sparkles!
+        if self.celebration_mode:
+            self.draw_celebration_burst(painter, center_x, center_y)
 
     def draw_core(self, painter, cx, cy, pulse):
         """Draw the central pulsing sphere."""
@@ -340,3 +385,63 @@ class NeuralSunWidget(QWidget):
                 y2_seg = y1 + (y2 - y1) * t2 + perp_y * offset
 
                 painter.drawLine(int(x1_seg), int(y1_seg), int(x2_seg), int(y2_seg))
+
+    def draw_celebration_burst(self, painter, cx, cy):
+        """
+        Draw celebration burst effect - rings of joy!
+        Hidden easter egg activated by triple-clicking the neural sun.
+        """
+        # Expanding rings
+        num_rings = 3
+        for i in range(num_rings):
+            ring_phase = (self.celebration_phase + i * 0.5) % 3.0
+            radius = 80 + (ring_phase * 60)
+            alpha = int(255 * (1.0 - ring_phase / 3.0))
+
+            # Rainbow color for each ring
+            hue = int((self.celebration_phase * 50 + i * 120) % 360)
+            ring_color = QColor.fromHsv(hue, 220, 255, alpha)
+
+            pen = QPen(ring_color, 3)
+            painter.setPen(pen)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawEllipse(int(cx - radius), int(cy - radius),
+                              int(radius * 2), int(radius * 2))
+
+        # Extra sparkles everywhere!
+        for i in range(50):
+            angle = (self.celebration_phase * 2 + i) % (math.pi * 2)
+            distance = 50 + (i * 3)
+            x = cx + math.cos(angle) * distance
+            y = cy + math.sin(angle) * distance
+
+            hue = int((self.celebration_phase * 100 + i * 7) % 360)
+            sparkle_color = QColor.fromHsv(hue, 255, 255, random.randint(150, 255))
+            painter.setPen(QPen(sparkle_color, 3))
+            painter.drawPoint(int(x), int(y))
+
+    def mousePressEvent(self, event):
+        """
+        Handle mouse clicks - triple-click activates celebration mode!
+        This is a joyful easter egg for those who discover it.
+        """
+        current_time = time.time()
+
+        # Check if click is within 0.5 seconds of last click
+        if current_time - self.last_click_time < 0.5:
+            self.click_count += 1
+        else:
+            self.click_count = 1
+
+        self.last_click_time = current_time
+
+        # Triple-click detected! 🎉
+        if self.click_count >= 3:
+            self.celebration_mode = True
+            self.celebration_phase = 0.0
+            self.celebration_timer = 0
+            self.click_count = 0
+
+            # Reset particles to center for the burst effect
+            for particle in self.particles:
+                particle['distance'] = random.uniform(80, 120)
