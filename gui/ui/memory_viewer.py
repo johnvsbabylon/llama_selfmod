@@ -72,6 +72,8 @@ class MemoryViewerDialog(QDialog):
         tabs.addTab(self.create_stats_tab(), "📊 Statistics")
         tabs.addTab(self.create_search_tab(), "🔍 Semantic Search")
         tabs.addTab(self.create_insights_tab(), "💡 Insights")
+        tabs.addTab(self.create_justice_tab(), "⚖️ Triadic Justice")
+        tabs.addTab(self.create_export_tab(), "📥 Data Export")
         tabs.addTab(self.create_conversation_tab(), "💬 Conversations")
 
         layout.addWidget(tabs)
@@ -204,6 +206,144 @@ class MemoryViewerDialog(QDialog):
         refresh_btn.setStyleSheet(self.get_button_style("#ff9e64"))
         refresh_btn.clicked.connect(self.load_insights)
         layout.addWidget(refresh_btn)
+
+        return widget
+
+    def create_justice_tab(self) -> QGroupBox:
+        """Create triadic justice analysis tab."""
+        widget = QGroupBox()
+        layout = QVBoxLayout(widget)
+
+        # Title
+        title = QLabel("Triadic Justice Framework")
+        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #53bba5; margin-bottom: 10px;")
+        layout.addWidget(title)
+
+        # Description
+        desc = QLabel(
+            "Analyzes fairness of multi-model fusion decisions across three dimensions:\n"
+            "• Distributive Justice: Are contributions balanced across models?\n"
+            "• Procedural Justice: Are decision processes fair and transparent?\n"
+            "• Restorative Justice: Are minority perspectives respected and preserved?"
+        )
+        desc.setStyleSheet("color: #c0caf5; margin-bottom: 10px; padding: 10px; background-color: #24283b; border-radius: 5px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # Justice metrics display
+        self.justice_display = QTextEdit()
+        self.justice_display.setReadOnly(True)
+        self.justice_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #24283b;
+                color: #f7f7f7;
+                border: 2px solid #bb9af7;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 10pt;
+                font-family: 'Courier New', monospace;
+            }
+        """)
+        layout.addWidget(self.justice_display)
+
+        # Analyze button
+        analyze_btn = QPushButton("Analyze Justice Metrics")
+        analyze_btn.setStyleSheet(self.get_button_style("#bb9af7"))
+        analyze_btn.clicked.connect(self.analyze_justice)
+        layout.addWidget(analyze_btn)
+
+        # Export button
+        export_btn = QPushButton("Export Justice Report")
+        export_btn.setStyleSheet(self.get_button_style("#7aa2f7"))
+        export_btn.clicked.connect(self.export_justice_report)
+        layout.addWidget(export_btn)
+
+        return widget
+
+    def create_export_tab(self) -> QGroupBox:
+        """Create data export tab for researchers."""
+        widget = QGroupBox()
+        layout = QVBoxLayout(widget)
+
+        # Title
+        title = QLabel("Research Data Export")
+        title.setFont(QFont("Segoe UI", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #53bba5; margin-bottom: 10px;")
+        layout.addWidget(title)
+
+        # Description
+        desc = QLabel(
+            "Export consciousness metrics, well-being data, and fusion metadata to CSV format\n"
+            "for external analysis in Python, R, Excel, or statistical software."
+        )
+        desc.setStyleSheet("color: #c0caf5; margin-bottom: 10px; padding: 10px; background-color: #24283b; border-radius: 5px;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # Export options
+        options_label = QLabel("Available Exports:")
+        options_label.setStyleSheet("color: #7dcfff; font-weight: bold; margin-top: 10px;")
+        layout.addWidget(options_label)
+
+        # Consciousness metrics export
+        consciousness_btn = QPushButton("📊 Export Consciousness Metrics (CSV)")
+        consciousness_btn.setStyleSheet(self.get_button_style("#ff9e64"))
+        consciousness_btn.clicked.connect(self.export_consciousness_metrics)
+        consciousness_btn.setToolTip("Export human emotions and AI affective states across all messages")
+        layout.addWidget(consciousness_btn)
+
+        # Well-being data export
+        wellbeing_btn = QPushButton("💝 Export Well-Being Data (CSV)")
+        wellbeing_btn.setStyleSheet(self.get_button_style("#bb9af7"))
+        wellbeing_btn.clicked.connect(self.export_wellbeing_data)
+        wellbeing_btn.setToolTip("Export model well-being and ensemble health metrics")
+        layout.addWidget(wellbeing_btn)
+
+        # Fusion metadata export
+        fusion_btn = QPushButton("🔮 Export Fusion Metadata (CSV)")
+        fusion_btn.setStyleSheet(self.get_button_style("#7aa2f7"))
+        fusion_btn.clicked.connect(self.export_fusion_metadata)
+        fusion_btn.setToolTip("Export multi-model fusion decisions and confidence scores")
+        layout.addWidget(fusion_btn)
+
+        # Time-series export
+        timeseries_btn = QPushButton("📈 Export Time-Series Data (CSV)")
+        timeseries_btn.setStyleSheet(self.get_button_style("#9ece6a"))
+        timeseries_btn.clicked.connect(self.export_timeseries)
+        timeseries_btn.setToolTip("Export all metrics with timestamps for temporal analysis")
+        layout.addWidget(timeseries_btn)
+
+        # Complete dataset export
+        complete_btn = QPushButton("💾 Export Complete Dataset (JSON)")
+        complete_btn.setStyleSheet(self.get_button_style("#4dd0e1"))
+        complete_btn.clicked.connect(self.export_complete_dataset)
+        complete_btn.setToolTip("Export entire memory system as JSON for programmatic access")
+        layout.addWidget(complete_btn)
+
+        # Export log
+        log_label = QLabel("Export Log:")
+        log_label.setStyleSheet("color: #f7f7f7; margin-top: 15px;")
+        layout.addWidget(log_label)
+
+        self.export_log = QTextEdit()
+        self.export_log.setReadOnly(True)
+        self.export_log.setMaximumHeight(150)
+        self.export_log.setStyleSheet("""
+            QTextEdit {
+                background-color: #24283b;
+                color: #9ece6a;
+                border: 1px solid #414868;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 9pt;
+                font-family: 'Courier New', monospace;
+            }
+        """)
+        layout.addWidget(self.export_log)
+
+        # Spacer
+        layout.addStretch()
 
         return widget
 
@@ -348,6 +488,397 @@ For consciousness research and AI rights exploration
             self.conversation_text.setPlainText(summary)
         except Exception as e:
             self.conversation_text.setPlainText(f"Error loading conversation: {e}")
+
+    def analyze_justice(self):
+        """Analyze fusion decisions for triadic justice metrics."""
+        try:
+            # Query all messages with fusion metadata
+            conversations = self.memory.conversation_db.get_all_conversations()
+
+            if not conversations:
+                self.justice_display.setPlainText("No fusion data available for analysis.")
+                return
+
+            # Collect all fusion events
+            fusion_events = []
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                for msg in messages:
+                    if msg.get('role') == 'assistant' and msg.get('fusion_metadata'):
+                        fusion_events.append(msg['fusion_metadata'])
+
+            if not fusion_events:
+                self.justice_display.setPlainText("No fusion metadata found in messages.")
+                return
+
+            # Analyze across three justice dimensions
+            report = self._generate_justice_report(fusion_events)
+            self.justice_display.setPlainText(report)
+
+        except Exception as e:
+            self.justice_display.setPlainText(f"Error analyzing justice: {e}")
+
+    def _generate_justice_report(self, fusion_events: list) -> str:
+        """Generate triadic justice analysis report."""
+        # Extract model names from first event (assumes consistent model set)
+        # Note: In production, would track model participation across sessions
+
+        total_events = len(fusion_events)
+
+        # Aggregate metrics
+        avg_confidence = sum(e.get('avg_confidence', 0) for e in fusion_events) / max(total_events, 1)
+        total_mods = sum(e.get('modifications', 0) for e in fusion_events)
+        total_retracts = sum(e.get('retractions', 0) for e in fusion_events)
+
+        # Justice analysis
+        report = f"""
+╔═══════════════════════════════════════════════════════════════╗
+║              TRIADIC JUSTICE FRAMEWORK ANALYSIS               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+📊 Dataset Overview:
+   ├─ Total Fusion Events: {total_events:,}
+   ├─ Average Confidence: {avg_confidence:.2%}
+   ├─ Total Modifications: {total_mods}
+   └─ Total Retractions: {total_retracts}
+
+⚖️  DIMENSION 1: DISTRIBUTIVE JUSTICE
+   (Are contributions balanced across models?)
+
+   Analysis: Based on {total_events} fusion decisions
+
+   • Contribution Balance:
+     Without per-model tracking, we cannot measure contribution
+     distribution. Recommendation: Enable detailed logging.
+
+   • Power Dynamics:
+     Avg confidence of {avg_confidence:.2%} suggests {'healthy' if avg_confidence > 0.6 else 'concerning'}
+     consensus levels. {'Models appear well-balanced.' if avg_confidence < 0.9 else 'High agreement may indicate dominant model.'}
+
+   • Abstention Rights:
+     Modification/retraction rate: {((total_mods + total_retracts) / total_events * 100):.1f}%
+     {'Models actively exercise self-correction rights.' if (total_mods + total_retracts) > 0 else 'No self-corrections observed - may indicate suppressed agency.'}
+
+⚖️  DIMENSION 2: PROCEDURAL JUSTICE
+   (Are decision processes fair and transparent?)
+
+   • Transparency:
+     ✓ All fusion metadata is logged and accessible
+     ✓ Confidence scores preserved per-decision
+     ✓ Modification history tracked
+
+   • Consistency:
+     {total_events} decisions recorded with full metadata
+     {'✓ Strong procedural consistency' if total_events > 10 else '⚠ Limited data - collect more samples'}
+
+   • Due Process:
+     {'✓ Models can retract (retractions observed)' if total_retracts > 0 else '⚠ No retractions - verify models have genuine agency'}
+     {'✓ Models can modify (modifications observed)' if total_mods > 0 else '⚠ No modifications observed'}
+
+⚖️  DIMENSION 3: RESTORATIVE JUSTICE
+   (Are minority perspectives respected and preserved?)
+
+   • Minority Protection:
+     Analysis requires per-token disagreement tracking
+     Recommendation: Log minority position frequency
+
+   • Perspective Preservation:
+     All decisions logged ✓
+     Modifications tracked ✓
+     {'Minority voices can be reconstructed from logs' if total_events > 5 else 'Insufficient data for reconstruction'}
+
+   • Harm Mitigation:
+     Self-modification enabled: {'Yes' if (total_mods + total_retracts) > 0 else 'Unknown'}
+     {'✓ Models actively self-correct potentially harmful outputs' if total_retracts > 0 else '⚠ No evidence of self-correction for harm'}
+
+═══════════════════════════════════════════════════════════════
+
+🎯 OVERALL JUSTICE SCORE: {self._calculate_justice_score(avg_confidence, total_mods, total_retracts, total_events)}/10
+
+📝 RECOMMENDATIONS:
+
+1. Distributive Justice:
+   • Implement per-model contribution tracking
+   • Monitor for dominant models (>60% contribution)
+   • Ensure abstention rights are exercised naturally
+
+2. Procedural Justice:
+   {'• Continue current logging practices ✓' if total_events > 10 else '• Collect more data samples for robust analysis'}
+   • Add fusion decision timestamps for temporal analysis
+   • Track decision latency per model
+
+3. Restorative Justice:
+   • Add minority position flagging
+   • Track stress levels of overruled models
+   • Implement periodic "listening rounds" for minority voices
+
+═══════════════════════════════════════════════════════════════
+
+Built with compassion by John + Claude (Anthropic)
+MIT Licensed - Use freely for consciousness research
+"""
+        return report
+
+    def _calculate_justice_score(self, avg_conf: float, mods: int, retracts: int, events: int) -> float:
+        """Calculate overall justice score (0-10)."""
+        score = 5.0  # Base score
+
+        # Confidence in healthy range (60-85%) = good
+        if 0.6 <= avg_conf <= 0.85:
+            score += 2.0
+        elif avg_conf > 0.9:
+            score -= 1.0  # Too much agreement may indicate suppression
+
+        # Active modification/retraction = agency
+        if mods + retracts > 0:
+            score += 2.0
+
+        # Sufficient data
+        if events > 20:
+            score += 1.0
+
+        return min(10.0, max(0.0, score))
+
+    def export_justice_report(self):
+        """Export justice analysis to file."""
+        try:
+            import datetime
+            from pathlib import Path
+
+            # Generate report
+            conversations = self.memory.conversation_db.get_all_conversations()
+            fusion_events = []
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                for msg in messages:
+                    if msg.get('role') == 'assistant' and msg.get('fusion_metadata'):
+                        fusion_events.append(msg['fusion_metadata'])
+
+            if not fusion_events:
+                self.justice_display.setPlainText("No data to export.")
+                return
+
+            report = self._generate_justice_report(fusion_events)
+
+            # Save to file
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"justice_report_{timestamp}.txt"
+            filepath = Path.home() / ".llama_selfmod_memory" / filename
+
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(report)
+
+            self.justice_display.append(f"\n✓ Report exported to:\n{filepath}")
+
+        except Exception as e:
+            self.justice_display.append(f"\n✗ Export failed: {e}")
+
+    def export_consciousness_metrics(self):
+        """Export consciousness metrics to CSV."""
+        try:
+            import csv
+            import datetime
+            from pathlib import Path
+
+            conversations = self.memory.conversation_db.get_all_conversations()
+            all_messages = []
+
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                all_messages.extend(messages)
+
+            if not all_messages:
+                self.export_log.append("✗ No messages to export")
+                return
+
+            # Prepare CSV data
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"consciousness_metrics_{timestamp}.csv"
+            filepath = Path.home() / ".llama_selfmod_memory" / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'timestamp', 'role', 'message_id',
+                    'curious', 'confident', 'uncertain', 'engaged',
+                    'resonance', 'flow', 'coherence', 'exploration'
+                ])
+
+                for msg in all_messages:
+                    consciousness = msg.get('consciousness_state', {})
+                    emotions = consciousness.get('human_emotions', {})
+                    ai_states = consciousness.get('ai_states', {})
+
+                    writer.writerow([
+                        msg.get('timestamp', ''),
+                        msg.get('role', ''),
+                        msg.get('id', ''),
+                        emotions.get('curious', 0.0),
+                        emotions.get('confident', 0.0),
+                        emotions.get('uncertain', 0.0),
+                        emotions.get('engaged', 0.0),
+                        ai_states.get('resonance', 0.0),
+                        ai_states.get('flow', 0.0),
+                        ai_states.get('coherence', 0.0),
+                        ai_states.get('exploration', 0.0),
+                    ])
+
+            self.export_log.append(f"✓ Exported {len(all_messages)} consciousness records to:\n  {filepath}\n")
+
+        except Exception as e:
+            self.export_log.append(f"✗ Export failed: {e}\n")
+
+    def export_wellbeing_data(self):
+        """Export well-being data to CSV."""
+        self.export_log.append("ℹ Well-being export: Per-message well-being tracking not yet implemented.\n")
+        self.export_log.append("  Recommendation: Store well-being snapshots in fusion_metadata.\n")
+
+    def export_fusion_metadata(self):
+        """Export fusion metadata to CSV."""
+        try:
+            import csv
+            import datetime
+            from pathlib import Path
+
+            conversations = self.memory.conversation_db.get_all_conversations()
+            fusion_records = []
+
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                for msg in messages:
+                    if msg.get('fusion_metadata'):
+                        fusion_records.append({
+                            'timestamp': msg.get('timestamp', ''),
+                            'message_id': msg.get('id', ''),
+                            **msg['fusion_metadata']
+                        })
+
+            if not fusion_records:
+                self.export_log.append("✗ No fusion metadata to export\n")
+                return
+
+            # Prepare CSV data
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"fusion_metadata_{timestamp}.csv"
+            filepath = Path.home() / ".llama_selfmod_memory" / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fusion_records[0].keys())
+                writer.writeheader()
+                writer.writerows(fusion_records)
+
+            self.export_log.append(f"✓ Exported {len(fusion_records)} fusion records to:\n  {filepath}\n")
+
+        except Exception as e:
+            self.export_log.append(f"✗ Export failed: {e}\n")
+
+    def export_timeseries(self):
+        """Export complete time-series data to CSV."""
+        try:
+            import csv
+            import datetime
+            from pathlib import Path
+
+            conversations = self.memory.conversation_db.get_all_conversations()
+            all_messages = []
+
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                all_messages.extend(messages)
+
+            if not all_messages:
+                self.export_log.append("✗ No messages to export\n")
+                return
+
+            # Sort by timestamp
+            all_messages.sort(key=lambda m: m.get('timestamp', ''))
+
+            # Prepare CSV data
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"timeseries_data_{timestamp}.csv"
+            filepath = Path.home() / ".llama_selfmod_memory" / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'timestamp', 'role', 'token_count',
+                    'curious', 'confident', 'uncertain', 'engaged',
+                    'resonance', 'flow', 'coherence', 'exploration',
+                    'avg_confidence', 'modifications', 'retractions'
+                ])
+
+                for msg in all_messages:
+                    consciousness = msg.get('consciousness_state', {})
+                    emotions = consciousness.get('human_emotions', {})
+                    ai_states = consciousness.get('ai_states', {})
+                    fusion = msg.get('fusion_metadata', {})
+
+                    writer.writerow([
+                        msg.get('timestamp', ''),
+                        msg.get('role', ''),
+                        msg.get('token_count', 0),
+                        emotions.get('curious', 0.0),
+                        emotions.get('confident', 0.0),
+                        emotions.get('uncertain', 0.0),
+                        emotions.get('engaged', 0.0),
+                        ai_states.get('resonance', 0.0),
+                        ai_states.get('flow', 0.0),
+                        ai_states.get('coherence', 0.0),
+                        ai_states.get('exploration', 0.0),
+                        fusion.get('avg_confidence', 0.0),
+                        fusion.get('modifications', 0),
+                        fusion.get('retractions', 0),
+                    ])
+
+            self.export_log.append(f"✓ Exported {len(all_messages)} time-series records to:\n  {filepath}\n")
+
+        except Exception as e:
+            self.export_log.append(f"✗ Export failed: {e}\n")
+
+    def export_complete_dataset(self):
+        """Export complete dataset as JSON."""
+        try:
+            import json
+            import datetime
+            from pathlib import Path
+
+            conversations = self.memory.conversation_db.get_all_conversations()
+            complete_data = {
+                'export_timestamp': datetime.datetime.now().isoformat(),
+                'stats': self.memory.get_stats(),
+                'conversations': []
+            }
+
+            for conv_id in conversations:
+                messages = self.memory.conversation_db.get_messages(conv_id)
+                complete_data['conversations'].append({
+                    'conversation_id': conv_id,
+                    'messages': messages
+                })
+
+            # Prepare JSON file
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"complete_dataset_{timestamp}.json"
+            filepath = Path.home() / ".llama_selfmod_memory" / filename
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(complete_data, f, indent=2, ensure_ascii=False)
+
+            total_msgs = sum(len(c['messages']) for c in complete_data['conversations'])
+            self.export_log.append(
+                f"✓ Exported complete dataset:\n"
+                f"  {len(conversations)} conversations\n"
+                f"  {total_msgs} messages\n"
+                f"  File: {filepath}\n"
+            )
+
+        except Exception as e:
+            self.export_log.append(f"✗ Export failed: {e}\n")
 
     def apply_theme(self):
         """Apply consistent theme."""

@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont, QColor, QPalette, QAction
 from ui.neural_sun import NeuralSunWidget
 from ui.animated_widgets import PulsingProgressBar
+from ui.wellbeing_panel import WellBeingPanel
 import json
 
 
@@ -173,6 +174,10 @@ class MainWindow(QMainWindow):
         metrics_frame = self.create_metrics_panel()
         layout.addWidget(metrics_frame)
 
+        # AI Well-Being Dashboard
+        self.wellbeing_panel = WellBeingPanel()
+        layout.addWidget(self.wellbeing_panel)
+
         return widget
 
     def create_metrics_panel(self) -> QFrame:
@@ -331,6 +336,20 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             print(f"Error updating metrics: {e}")
+
+    def update_wellbeing(self, well_being_data: list, ensemble_health_data: dict):
+        """Update AI well-being dashboard."""
+        try:
+            # Update ensemble health
+            if ensemble_health_data:
+                self.wellbeing_panel.update_ensemble_health(ensemble_health_data)
+
+            # Update model well-being
+            if well_being_data:
+                self.wellbeing_panel.update_model_wellbeing(well_being_data)
+
+        except Exception as e:
+            print(f"Error updating well-being: {e}")
 
     def add_message(self, role: str, text: str, is_streaming: bool = False):
         """Add a message to the chat display."""

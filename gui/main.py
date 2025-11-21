@@ -231,6 +231,8 @@ class ConsciousnessPlatform:
         """Handle token event."""
         text = event.get("text", "")
         consciousness = event.get("consciousness", {})
+        well_being = event.get("well_being")
+        ensemble_health = event.get("ensemble_health")
 
         # Accumulate response for memory
         self.current_ai_response += text
@@ -241,6 +243,10 @@ class ConsciousnessPlatform:
 
         # Update consciousness metrics
         self.window.update_consciousness_metrics(consciousness)
+
+        # Update well-being dashboard
+        if well_being:
+            self.window.update_wellbeing(well_being, ensemble_health)
 
     def on_complete(self, event: dict):
         """Handle completion event."""

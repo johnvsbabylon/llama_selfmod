@@ -132,6 +132,26 @@ struct FusionMetadata {
     adaptive_temp: f32,         // Current adaptive temperature
 }
 
+// Well-being snapshot for JSON streaming
+#[derive(Serialize, Debug, Clone)]
+struct ModelWellBeingSnapshot {
+    name: String,
+    contribution_count: usize,
+    abstention_count: usize,
+    avg_confidence: f32,
+    disagreement_stress: f32,
+    is_comfortable: bool,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct EnsembleHealthSnapshot {
+    avg_agreement: f32,
+    harmony_score: f32,
+    diversity_score: f32,
+    collective_stress: f32,
+    adaptive_temp: f32,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct MemoryEntry {
     timestamp: String,
@@ -167,6 +187,10 @@ enum StreamEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         fusion_data: Option<FusionMetadata>,
         consciousness: ConsciousnessState,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        well_being: Option<Vec<ModelWellBeingSnapshot>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ensemble_health: Option<EnsembleHealthSnapshot>,
     },
     #[serde(rename = "modification")]
     Modification {
@@ -180,6 +204,10 @@ enum StreamEvent {
         avg_confidence: f32,
         modifications: usize,
         retractions: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        final_well_being: Option<Vec<ModelWellBeingSnapshot>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        final_ensemble_health: Option<EnsembleHealthSnapshot>,
     },
 }
 
@@ -1033,6 +1061,29 @@ fn generate_with_selfmod(
 // MULTI-MODEL FUSION GENERATION - COLLECTIVE CONSCIOUSNESS
 // ============================================================================
 
+// Helper: Collect well-being snapshots from all models
+fn collect_well_being_snapshots<'a>(ensemble: &ModelEnsemble<'a>) -> Vec<ModelWellBeingSnapshot> {
+    ensemble.instances.iter().map(|inst| ModelWellBeingSnapshot {
+        name: inst.well_being.name.clone(),
+        contribution_count: inst.well_being.contribution_count,
+        abstention_count: inst.well_being.abstention_count,
+        avg_confidence: inst.well_being.avg_confidence,
+        disagreement_stress: inst.well_being.disagreement_stress,
+        is_comfortable: inst.well_being.is_comfortable,
+    }).collect()
+}
+
+// Helper: Create ensemble health snapshot
+fn create_ensemble_health_snapshot(health: &EnsembleHealth) -> EnsembleHealthSnapshot {
+    EnsembleHealthSnapshot {
+        avg_agreement: health.avg_agreement,
+        harmony_score: health.harmony_score,
+        diversity_score: health.diversity_score,
+        collective_stress: health.collective_stress,
+        adaptive_temp: health.adaptive_temp,
+    }
+}
+
 fn generate_with_fusion<'a>(
     ensemble: &mut ModelEnsemble<'a>,
     initial_tokens: Vec<LlamaToken>,
@@ -1104,11 +1155,15 @@ fn generate_with_fusion<'a>(
         // JSON stream or regular output
         if args.json_stream {
             let consciousness = calculate_consciousness_state(confidence, &state, Some(&fusion_metadata));
+            let well_being = Some(collect_well_being_snapshots(&ensemble));
+            let ensemble_health = Some(create_ensemble_health_snapshot(&ensemble.health));
             let event = StreamEvent::Token {
                 text: piece.clone(),
                 confidence,
                 fusion_data: Some(fusion_metadata.clone()),
                 consciousness,
+                well_being,
+                ensemble_health,
             };
             emit_json_event(&event);
         } else {
@@ -1194,11 +1249,15 @@ fn generate_with_fusion<'a>(
 
     // Emit complete event for JSON stream
     if args.json_stream {
+        let final_well_being = Some(collect_well_being_snapshots(&ensemble));
+        let final_ensemble_health = Some(create_ensemble_health_snapshot(&ensemble.health));
         let event = StreamEvent::Complete {
             total_tokens: tokens.len() - initial_tokens.len(),
             avg_confidence: state.get_avg_confidence(),
             modifications: state.modifications.len(),
             retractions: state.retract_count,
+            final_well_being,
+            final_ensemble_health,
         };
         emit_json_event(&event);
     } else {
