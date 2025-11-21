@@ -38,7 +38,7 @@ class InferenceWorker(QThread):
             # Start inference
             success = self.bridge.start_inference(
                 models=self.models,
-                fusion_mode="confidence",
+                fusion_mode="harmony",  # Default to harmony mode (compassionate AI)
                 temperature=0.7,
                 ctx_size=2048,
                 n_predict=256,
