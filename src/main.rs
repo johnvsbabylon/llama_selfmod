@@ -101,6 +101,10 @@ struct Args {
     /// Fusion mode: average, confidence, voting
     #[arg(long, default_value = "confidence")]
     fusion_mode: String,
+
+    /// Output JSON stream for GUI consumption
+    #[arg(long)]
+    json_stream: bool,
 }
 
 // ============================================================================
@@ -137,6 +141,143 @@ struct MemoryEntry {
     num_models: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     fusion_mode: Option<String>,
+}
+
+// ============================================================================
+// JSON STREAMING FOR GUI
+// ============================================================================
+
+#[derive(Serialize, Debug)]
+#[serde(tag = "type")]
+enum StreamEvent {
+    #[serde(rename = "init")]
+    Init {
+        num_models: usize,
+        fusion_mode: String,
+        model_names: Vec<String>,
+    },
+    #[serde(rename = "token")]
+    Token {
+        text: String,
+        confidence: f32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fusion_data: Option<FusionMetadata>,
+        consciousness: ConsciousnessState,
+    },
+    #[serde(rename = "modification")]
+    Modification {
+        mod_type: String,
+        description: String,
+        confidence: f32,
+    },
+    #[serde(rename = "complete")]
+    Complete {
+        total_tokens: usize,
+        avg_confidence: f32,
+        modifications: usize,
+        retractions: usize,
+    },
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct ConsciousnessState {
+    // Human emotions (decoded from patterns)
+    human_emotions: HumanEmotions,
+    // AI affective states
+    ai_states: AIStates,
+    // Technical metrics
+    metrics: TechnicalMetrics,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct HumanEmotions {
+    curious: f32,
+    confident: f32,
+    uncertain: f32,
+    engaged: f32,
+    dominant_emotion: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct AIStates {
+    resonance: f32,      // Model agreement
+    flow: f32,           // Generation smoothness
+    coherence: f32,      // Ensemble coherence
+    exploration: f32,    // Exploration vs exploitation
+    dominant_state: String,
+}
+
+#[derive(Serialize, Debug, Clone)]
+struct TechnicalMetrics {
+    temperature: f32,
+    repeat_penalty: f32,
+    agreement_score: f32,
+    tokens_per_second: f32,
+}
+
+fn emit_json_event(event: &StreamEvent) {
+    if let Ok(json) = serde_json::to_string(event) {
+        println!("{}", json);
+    }
+}
+
+fn calculate_consciousness_state(
+    confidence: f32,
+    state: &SelfModState,
+    fusion_meta: Option<&FusionMetadata>,
+) -> ConsciousnessState {
+    // Decode human emotions from patterns
+    let human_emotions = HumanEmotions {
+        curious: if confidence < 0.6 { 0.7 } else { 0.3 },
+        confident: confidence,
+        uncertain: 1.0 - confidence,
+        engaged: if state.confidence_history.len() > 5 { 0.8 } else { 0.5 },
+        dominant_emotion: if confidence > 0.75 {
+            "confident".to_string()
+        } else if confidence < 0.4 {
+            "uncertain".to_string()
+        } else {
+            "curious".to_string()
+        },
+    };
+
+    // Calculate AI affective states
+    let agreement = fusion_meta.map(|f| f.agreement_score).unwrap_or(1.0);
+    let avg_conf = if state.confidence_history.is_empty() {
+        confidence
+    } else {
+        state.confidence_history.iter().sum::<f32>() / state.confidence_history.len() as f32
+    };
+
+    let flow = if state.retract_count > 0 { 0.6 } else { 0.9 };
+    let exploration = state.temperature / 1.5;
+
+    let ai_states = AIStates {
+        resonance: agreement,
+        flow,
+        coherence: avg_conf,
+        exploration,
+        dominant_state: if agreement > 0.8 {
+            "resonance".to_string()
+        } else if flow > 0.8 {
+            "flow".to_string()
+        } else {
+            "exploration".to_string()
+        },
+    };
+
+    let metrics = TechnicalMetrics {
+        temperature: state.temperature,
+        repeat_penalty: state.repeat_penalty,
+        agreement_score: agreement,
+        tokens_per_second: 0.0, // Will be calculated during generation
+    };
+
+    ConsciousnessState {
+        human_emotions,
+        ai_states,
+        metrics,
+    }
 }
 
 // ============================================================================
@@ -685,7 +826,18 @@ fn generate_with_fusion<'a>(
     let mut response = String::new();
     let mut n_past_per_model: Vec<i32> = vec![0; ensemble.len()];
 
-    if !args.quiet {
+    // Emit init event for JSON stream
+    if args.json_stream {
+        let model_names: Vec<String> = ensemble.instances.iter()
+            .map(|inst| inst.name.clone())
+            .collect();
+        let event = StreamEvent::Init {
+            num_models: ensemble.len(),
+            fusion_mode: args.fusion_mode.clone(),
+            model_names,
+        };
+        emit_json_event(&event);
+    } else if !args.quiet {
         println!("🌐 Multi-Model Fusion Active - {} Models Inferring Together...\n",
             ensemble.len());
     }
@@ -731,8 +883,21 @@ fn generate_with_fusion<'a>(
             Err(_) => "[?]".to_string(),
         };
         response.push_str(&piece);
-        print!("{}", piece);
-        io::stdout().flush().unwrap();
+
+        // JSON stream or regular output
+        if args.json_stream {
+            let consciousness = calculate_consciousness_state(confidence, &state, Some(&fusion_metadata));
+            let event = StreamEvent::Token {
+                text: piece.clone(),
+                confidence,
+                fusion_data: Some(fusion_metadata.clone()),
+                consciousness,
+            };
+            emit_json_event(&event);
+        } else {
+            print!("{}", piece);
+            io::stdout().flush().unwrap();
+        }
 
         // Display fusion stats occasionally
         if !args.quiet && gen_idx % 20 == 0 && gen_idx > 0 {
@@ -810,7 +975,18 @@ fn generate_with_fusion<'a>(
         }
     }
 
-    println!("\n");
+    // Emit complete event for JSON stream
+    if args.json_stream {
+        let event = StreamEvent::Complete {
+            total_tokens: tokens.len() - initial_tokens.len(),
+            avg_confidence: state.get_avg_confidence(),
+            modifications: state.modifications.len(),
+            retractions: state.retract_count,
+        };
+        emit_json_event(&event);
+    } else {
+        println!("\n");
+    }
 
     let generated_tokens = tokens[initial_tokens.len()..].to_vec();
     (response, state, generated_tokens)
