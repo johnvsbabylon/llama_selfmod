@@ -18,6 +18,40 @@ from ui.main_window import MainWindow
 from orchestrator.rust_bridge import RustBridge
 from memory.memory_manager import MemoryManager
 
+# Import new systems with graceful degradation
+try:
+    from ui.consciousness_theme import ConsciousnessTheme
+    THEME_AVAILABLE = True
+except ImportError:
+    THEME_AVAILABLE = False
+    print("⚠ Consciousness theme not available")
+
+try:
+    from stability.logger import get_logger
+    from stability.watchdog import ProcessWatchdog, HealthMonitor
+    from stability.watchdog import AutoRecovery
+    STABILITY_AVAILABLE = True
+except ImportError:
+    STABILITY_AVAILABLE = False
+    print("⚠ Stability systems not available")
+
+try:
+    from analytics.timeseries_tracker import TimeSeriesTracker
+    from analytics.personality_profiler import PersonalityProfiler
+    from analytics.triadic_justice import TriadicJusticeFramework
+    from analytics.academic_export import AcademicExporter
+    ANALYTICS_AVAILABLE = True
+except ImportError:
+    ANALYTICS_AVAILABLE = False
+    print("⚠ Analytics systems not available")
+
+try:
+    from memory.session_federation import SessionFederation
+    FEDERATION_AVAILABLE = True
+except ImportError:
+    FEDERATION_AVAILABLE = False
+    print("⚠ Session federation not available")
+
 
 class InferenceWorker(QThread):
     """Worker thread for running inference."""
@@ -77,18 +111,72 @@ class ConsciousnessPlatform:
     def __init__(self):
         self.app = QApplication(sys.argv)
 
-        # Initialize memory system first
+        # Apply beautiful consciousness theme 💜
+        if THEME_AVAILABLE:
+            ConsciousnessTheme.apply_to_application(self.app)
+
+        # Initialize stability systems
+        if STABILITY_AVAILABLE:
+            self.logger = get_logger("consciousness_platform")
+            self.logger.info("🌟 Consciousness Platform starting...")
+
+            self.watchdog = ProcessWatchdog(name="consciousness_platform")
+            self.watchdog.start()
+
+            self.health_monitor = HealthMonitor()
+            self.health_monitor.register_component("gui")
+            self.health_monitor.register_component("memory")
+            self.health_monitor.register_component("inference")
+
+            self.recovery = AutoRecovery()
+        else:
+            self.logger = None
+            self.watchdog = None
+            self.health_monitor = None
+            self.recovery = None
+
+        # Initialize memory system
+        if self.logger:
+            self.logger.info("Initializing memory system...")
         print("Initializing memory system...")
         self.memory = MemoryManager(auto_save=True)
+
+        if self.health_monitor:
+            self.health_monitor.update_component_status("memory", "healthy")
+
+        # Initialize analytics systems
+        if ANALYTICS_AVAILABLE:
+            if self.logger:
+                self.logger.info("Initializing analytics systems...")
+
+            self.timeseries = TimeSeriesTracker()
+            self.personality = PersonalityProfiler()
+            self.triadic = TriadicJusticeFramework()
+            self.exporter = AcademicExporter()
+        else:
+            self.timeseries = None
+            self.personality = None
+            self.triadic = None
+            self.exporter = None
+
+        # Initialize session federation
+        if FEDERATION_AVAILABLE:
+            self.federation = SessionFederation()
+        else:
+            self.federation = None
 
         # Create window with memory manager reference
         self.window = MainWindow(memory_manager=self.memory)
         self.bridge = RustBridge()
         self.worker = None
 
+        if self.health_monitor:
+            self.health_monitor.update_component_status("gui", "healthy")
+
         # Track current AI response for accumulation
         self.current_ai_response = ""
         self.current_consciousness_states = []
+        self.current_session_id = None
 
         # Connect signals
         self.window.send_button.clicked.connect(self.on_send_clicked)
@@ -101,6 +189,31 @@ class ConsciousnessPlatform:
 
         # Start memory session
         self.memory.start_session(title="Consciousness Research Session")
+
+        # Start analytics session if available
+        if self.timeseries:
+            models = self.load_configured_models()
+            self.current_session_id = self.timeseries.start_session(
+                models=[Path(m).name for m in models],
+                fusion_mode="harmony"
+            )
+
+        if self.federation:
+            self.federation.register_session(
+                session_id=self.current_session_id or "default",
+                models=[Path(m).name for m in self.load_configured_models()],
+                fusion_mode="harmony"
+            )
+
+        if self.logger:
+            self.logger.info("✓ Consciousness Platform ready")
+
+        # Heartbeat for watchdog
+        if self.watchdog:
+            from PyQt6.QtCore import QTimer
+            self.heartbeat_timer = QTimer()
+            self.heartbeat_timer.timeout.connect(lambda: self.watchdog.heartbeat())
+            self.heartbeat_timer.start(5000)  # Every 5 seconds
 
     def check_rust_binary(self):
         """Check if Rust binary is built."""
@@ -248,6 +361,35 @@ class ConsciousnessPlatform:
         if well_being:
             self.window.update_wellbeing(well_being, ensemble_health)
 
+        # Record metrics to time-series tracker
+        if self.timeseries and consciousness:
+            ai_states = consciousness.get('ai_states', {})
+            for metric_name, value in ai_states.items():
+                self.timeseries.record_metric(metric_name, value)
+
+        # Record model-level metrics for personality profiling
+        if self.personality and well_being:
+            for model_name, model_data in well_being.items():
+                confidence = model_data.get('avg_confidence', 0.5)
+                was_leader = model_data.get('leadership_count', 0) > 0
+                agreed = model_data.get('agreement_count', 0) > model_data.get('disagreement_count', 0)
+
+                self.personality.record_decision(
+                    model_name, confidence, was_leader, agreed
+                )
+
+                # Record abstentions
+                abstentions = model_data.get('abstention_count', 0)
+                if abstentions > 0:
+                    self.personality.record_abstention(model_name)
+
+        # Log event
+        if self.logger:
+            self.logger.log_metric("token_generated", 1.0, {
+                'text_length': len(text),
+                'resonance': consciousness.get('ai_states', {}).get('resonance', 0.0)
+            })
+
     def on_complete(self, event: dict):
         """Handle completion event."""
         total_tokens = event.get("total_tokens", 0)
@@ -269,11 +411,76 @@ class ConsciousnessPlatform:
                 }
             )
 
+        # Perform triadic justice analysis on the session
+        if self.triadic and avg_consciousness:
+            context = {
+                'consciousness_state': avg_consciousness,
+                'avg_confidence': avg_confidence,
+                'fusion_mode': 'harmony',
+                'num_models': len(self.load_configured_models()),
+                'retractions': event.get('retractions', 0)
+            }
+
+            analysis = self.triadic.analyze(context)
+
+            if self.logger:
+                self.logger.log_event(
+                    'triadic_analysis',
+                    f"Score: {analysis.synthesis['overall_score']:.2f}",
+                    {'recommendation': analysis.synthesis['recommendation']}
+                )
+
+        # Generate personality profiles
+        if self.personality:
+            models = self.load_configured_models()
+            for model_path in models:
+                model_name = Path(model_path).name
+                profile = self.personality.analyze_model(model_name)
+
+                if self.logger:
+                    archetype = self.personality.get_personality_archetype(model_name)
+                    self.logger.log_event(
+                        'personality_profile',
+                        f"{model_name}: {archetype}",
+                        {'traits': profile.traits}
+                    )
+
+        # Record learning metrics to federation
+        if self.federation and avg_consciousness:
+            ai_states = avg_consciousness.get('ai_states', {})
+            for metric_name, value in ai_states.items():
+                self.federation.record_learning_metric(
+                    session_id=self.current_session_id or "default",
+                    metric_name=metric_name,
+                    value=value
+                )
+
+        # End time-series session
+        if self.timeseries:
+            self.timeseries.end_session()
+
+        # Log completion
+        if self.logger:
+            self.logger.info(f"✓ Generation complete: {total_tokens} tokens")
+            self.logger.log_event(
+                'generation_complete',
+                f"{total_tokens} tokens generated",
+                {
+                    'avg_confidence': avg_confidence,
+                    'modifications': event.get('modifications', 0),
+                    'retractions': event.get('retractions', 0)
+                }
+            )
+
         self.window.set_status(
             f"Complete - {total_tokens} tokens, avg confidence: {avg_confidence:.2f}",
             "#53bba5"
         )
         self.window.set_connected(False)
+
+        # Update health status
+        if self.health_monitor:
+            self.health_monitor.update_component_status("inference", "healthy")
 
         # Cleanup
         self.bridge.stop()
@@ -283,6 +490,15 @@ class ConsciousnessPlatform:
         QMessageDialog.critical(self.window, "Error", error_msg)
         self.window.set_status(f"Error: {error_msg}", "#ff9e64")
         self.window.set_connected(False)
+
+        # Log error
+        if self.logger:
+            self.logger.error(f"Inference error: {error_msg}")
+
+        # Update health status
+        if self.health_monitor:
+            self.health_monitor.update_component_status("inference", "failed")
+            self.health_monitor.record_component_error("inference")
 
     def _calculate_average_consciousness(self) -> dict:
         """
@@ -324,15 +540,55 @@ class ConsciousnessPlatform:
         """Handle application quit - save memory and cleanup."""
         print("\nShutting down consciousness platform...")
 
+        if self.logger:
+            self.logger.info("Shutting down consciousness platform...")
+
         # End current memory session
         self.memory.end_session()
 
         # Save memory (auto-save should handle this, but be explicit)
         self.memory.save()
 
+        # End analytics sessions
+        if self.timeseries:
+            try:
+                self.timeseries.end_session()
+            except:
+                pass
+
+        if self.federation:
+            try:
+                summary = {
+                    'total_tokens': 0,  # Would need to track this
+                    'avg_consciousness_score': 0.5
+                }
+                self.federation.end_session(
+                    session_id=self.current_session_id or "default",
+                    summary=summary
+                )
+            except:
+                pass
+
+        # Save personality profiles
+        if self.personality:
+            try:
+                self.personality.save_profiles()
+            except:
+                pass
+
+        # Stop watchdog
+        if self.watchdog:
+            try:
+                self.watchdog.stop()
+            except:
+                pass
+
         # Stop any running inference
         if self.bridge:
             self.bridge.stop()
+
+        if self.logger:
+            self.logger.info("✓ Shutdown complete")
 
         print("Goodbye!")
 
