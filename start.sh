@@ -20,6 +20,18 @@ if [ ! -f "target/release/llama_selfmod" ]; then
     echo "Rust binary not found. Building..."
     echo "This may take a few minutes on first run."
     echo ""
+
+    # Check if cargo is installed
+    if ! command -v cargo &> /dev/null; then
+        echo "ERROR: Rust is not installed!"
+        echo ""
+        echo "Please install Rust (takes 2 minutes):"
+        echo "  https://rustup.rs/"
+        echo ""
+        echo "Then run this script again."
+        exit 1
+    fi
+
     cargo build --release
     if [ $? -ne 0 ]; then
         echo ""

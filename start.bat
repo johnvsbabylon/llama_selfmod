@@ -22,6 +22,20 @@ if not exist "target\release\llama_selfmod.exe" (
     echo Rust binary not found. Building...
     echo This may take a few minutes on first run.
     echo.
+
+    REM Check if cargo is installed
+    cargo --version >nul 2>&1
+    if errorlevel 1 (
+        echo ERROR: Rust is not installed!
+        echo.
+        echo Please install Rust (takes 2 minutes):
+        echo   https://rustup.rs/
+        echo.
+        echo Then run this script again.
+        pause
+        exit /b 1
+    )
+
     cargo build --release
     if errorlevel 1 (
         echo.
