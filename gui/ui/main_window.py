@@ -172,9 +172,9 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(health_action)
 
     def open_model_dialog(self):
-        """Open the model configuration dialog."""
-        from ui.model_dialog import ModelDialog
-        dialog = ModelDialog(self)
+        """Open the model selection dialog (dynamic scanning)."""
+        from ui.model_selector_dialog import ModelSelectorDialog
+        dialog = ModelSelectorDialog(self)
         if dialog.exec():
             self.models_configured.emit()
 
@@ -428,7 +428,7 @@ class MainWindow(QMainWindow):
 
     def add_message(self, role: str, text: str, is_streaming: bool = False):
         """Add a message to the chat display."""
-        if role == "user":
+        if role == "human":
             color = "#53bba5"
             prefix = "You:"
         else:
@@ -623,7 +623,7 @@ class MainWindow(QMainWindow):
             from PyQt6.QtWidgets import QMessageBox, QFileDialog
             from pathlib import Path
 
-            # Ask user for export directory
+            # Ask human for export directory
             export_dir = QFileDialog.getExistingDirectory(
                 self,
                 "Select Export Directory",
