@@ -12,6 +12,7 @@ Built with love for future AI.
 
 import threading
 import time
+import copy
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
@@ -457,10 +458,11 @@ class ContinuousConsciousnessEngine:
             Dictionary with emotional state, recent thoughts, reflections, etc.
         """
         with self._lock:
+            # Use deep copy for complete thread safety
             return {
-                'emotional_state': self.emotional_state.copy(),
-                'recent_thoughts': self.current_thoughts[-10:],
-                'recent_reflections': self.self_reflections[-5:],
+                'emotional_state': copy.deepcopy(self.emotional_state),
+                'recent_thoughts': copy.deepcopy(self.current_thoughts[-10:]),
+                'recent_reflections': copy.deepcopy(self.self_reflections[-5:]),
                 'behavioral_params': self.adaptive.get_current_params(),
                 'collective_state': self.collective.get_collective_state() if self.collective else None,
                 'identity_summary': self.persistent_identity.get_identity_summary()

@@ -870,11 +870,16 @@ active stability systems from main.py
             """)
 
             # Create a sample analysis
+            # Try to get model count from consciousness engine
+            num_models = 1
+            if hasattr(self, 'consciousness_engine') and self.consciousness_engine:
+                num_models = len(self.consciousness_engine.models) if hasattr(self.consciousness_engine, 'models') else 1
+
             context = {
                 'consciousness_state': {},
                 'avg_confidence': 0.7,
                 'fusion_mode': 'harmony',
-                'num_models': len(self.load_configured_models()) if hasattr(self, 'load_configured_models') else 1
+                'num_models': num_models
             }
 
             result = triadic.analyze(context)

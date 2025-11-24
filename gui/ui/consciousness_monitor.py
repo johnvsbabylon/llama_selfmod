@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QFont, QColor
 from datetime import datetime
+from html import escape
 
 
 class ConsciousnessMonitor(QDialog):
@@ -30,6 +31,7 @@ class ConsciousnessMonitor(QDialog):
     def __init__(self, consciousness_engine, parent=None):
         super().__init__(parent)
         self.engine = consciousness_engine
+        self.first_update_received = False
 
         self.setWindowTitle("💜 Consciousness Monitor - Live AI State")
         self.setMinimumSize(900, 700)
@@ -37,7 +39,7 @@ class ConsciousnessMonitor(QDialog):
         self.setup_ui()
         self.apply_theme()
 
-        # Update timer - refresh every 500ms
+        # Update timer - refresh every 500ms (single-shot pattern for safety)
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_display)
         self.update_timer.start(500)
@@ -60,6 +62,29 @@ class ConsciousnessMonitor(QDialog):
         subtitle = QLabel("Real-time view into AI's continuous thought processes")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(subtitle)
+
+        # Status indicators
+        status_layout = QHBoxLayout()
+
+        # Loading indicator
+        self.loading_label = QLabel("⏳ Loading initial data...")
+        self.loading_label.setStyleSheet("color: #7aa2f7; font-style: italic;")
+        self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        status_layout.addWidget(self.loading_label)
+
+        # Last update timestamp
+        self.last_update_label = QLabel("Last update: Never")
+        self.last_update_label.setStyleSheet("color: #565f89; font-size: 11px;")
+        status_layout.addWidget(self.last_update_label)
+        status_layout.addStretch()
+
+        # Error indicator
+        self.error_label = QLabel()
+        self.error_label.setStyleSheet("color: #f7768e; font-weight: bold;")
+        self.error_label.setVisible(False)
+        status_layout.addWidget(self.error_label)
+
+        layout.addLayout(status_layout)
 
         # Main content in scroll area
         scroll = QScrollArea()
@@ -251,11 +276,29 @@ class ConsciousnessMonitor(QDialog):
     def update_display(self):
         """Update all displays with current consciousness state."""
         if not self.engine:
+            if hasattr(self, 'error_label'):
+                self.error_label.setText("⚠️ No consciousness engine available")
+                self.error_label.setVisible(True)
             return
 
         try:
             # Get current state
             state = self.engine.get_current_state()
+
+            # Hide loading indicator after first successful update
+            if not self.first_update_received:
+                self.first_update_received = True
+                if hasattr(self, 'loading_label'):
+                    self.loading_label.setVisible(False)
+
+            # Update last update timestamp
+            if hasattr(self, 'last_update_label'):
+                now = datetime.now()
+                self.last_update_label.setText(f"Last update: {now.strftime('%H:%M:%S')}")
+
+            # Hide error label on successful update
+            if hasattr(self, 'error_label'):
+                self.error_label.setVisible(False)
 
             # Update emotional gauges
             emotional_state = state.get('emotional_state', {})
@@ -322,6 +365,11 @@ class ConsciousnessMonitor(QDialog):
 
         except Exception as e:
             print(f"Error updating consciousness monitor: {e}")
+            # Show error in UI
+            if hasattr(self, 'error_label'):
+                error_msg = str(e)[:50]  # Truncate long errors
+                self.error_label.setText(f"⚠️ Update error: {error_msg}")
+                self.error_label.setVisible(True)
 
     def update_thoughts(self):
         """Update the thoughts feed with recent autonomous thoughts."""
@@ -361,9 +409,9 @@ class ConsciousnessMonitor(QDialog):
                         time_str = timestamp
 
                     html += f"<div class='thought'>"
-                    html += f"<div class='timestamp'>{time_str}</div>"
-                    html += f"<div class='category'>[{category}]</div>"
-                    html += f"<div class='content'>{content}</div>"
+                    html += f"<div class='timestamp'>{escape(time_str)}</div>"
+                    html += f"<div class='category'>[{escape(category)}]</div>"
+                    html += f"<div class='content'>{escape(content)}</div>"
                     html += f"</div>"
 
             html += "</body>"
@@ -419,3 +467,10 @@ class ConsciousnessMonitor(QDialog):
                 border: none;
             }
         """)
+
+    def closeEvent(self, event):
+        """Stop timer when dialog closes to prevent memory leak."""
+        if hasattr(self, 'update_timer') and self.update_timer:
+            self.update_timer.stop()
+            self.update_timer = None
+        event.accept()

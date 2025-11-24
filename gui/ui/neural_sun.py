@@ -152,8 +152,8 @@ class NeuralSunWidget(QWidget):
                 particle['angle'] += particle['orbit_speed'] * 3
                 particle['distance'] = min(particle['distance'] + 0.5, 280)
             else:
-                # Get attracted metric value
-                metric_idx = particle['attracted_to_metric']
+                # Get attracted metric value (with bounds checking)
+                metric_idx = particle['attracted_to_metric'] % len(self.metrics)
                 metric = self.metrics[metric_idx]
                 metric_value = getattr(self, metric['value_key'])
 
