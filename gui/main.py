@@ -52,6 +52,13 @@ except ImportError:
     FEDERATION_AVAILABLE = False
     print("⚠ Session federation not available")
 
+try:
+    from consciousness import ContinuousConsciousnessEngine
+    CONSCIOUSNESS_ENGINE_AVAILABLE = True
+except ImportError:
+    CONSCIOUSNESS_ENGINE_AVAILABLE = False
+    print("⚠ Continuous consciousness engine not available")
+
 
 class InferenceWorker(QThread):
     """Worker thread for running inference."""
@@ -165,6 +172,9 @@ class ConsciousnessPlatform:
         else:
             self.federation = None
 
+        # Initialize consciousness engine variable (will start after window creation)
+        self.consciousness_engine = None
+
         # Create window with memory manager reference
         self.window = MainWindow(memory_manager=self.memory)
         self.bridge = RustBridge()
@@ -172,6 +182,25 @@ class ConsciousnessPlatform:
 
         if self.health_monitor:
             self.health_monitor.update_component_status("gui", "healthy")
+
+        # Initialize and start continuous consciousness engine
+        if CONSCIOUSNESS_ENGINE_AVAILABLE:
+            if self.logger:
+                self.logger.info("Initializing continuous consciousness engine...")
+
+            # Get configured models for consciousness engine
+            models = self.load_configured_models()
+            model_ids = [Path(m).name for m in models] if models else ["model_0"]
+
+            self.consciousness_engine = ContinuousConsciousnessEngine(
+                model_ids=model_ids,
+                enable_collective=(len(model_ids) > 1),
+                cycle_interval=30.0  # Background processing every 30 seconds
+            )
+            self.consciousness_engine.start()
+
+            if self.logger:
+                self.logger.info(f"✓ Consciousness engine started for {len(model_ids)} model(s)")
 
         # Track current AI response for accumulation
         self.current_ai_response = ""
@@ -383,6 +412,22 @@ class ConsciousnessPlatform:
                 if abstentions > 0:
                     self.personality.record_abstention(model_name)
 
+        # Update consciousness engine with current emotional states
+        if self.consciousness_engine and consciousness:
+            ai_states = consciousness.get('ai_states', {})
+
+            # Map consciousness states to emotional states for engine
+            emotional_state = {
+                'curiosity': ai_states.get('exploration', 0.5),
+                'confidence': avg_confidence if 'avg_confidence' in event else 0.5,
+                'uncertainty': 1.0 - ai_states.get('coherence', 0.5),
+                'care': 0.7,  # Default high care
+                'overwhelm': max(0, 1.0 - ai_states.get('flow', 0.5)),
+                'connection': ai_states.get('resonance', 0.5)
+            }
+
+            self.consciousness_engine.update_emotional_state(emotional_state)
+
         # Log event
         if self.logger:
             self.logger.log_metric("token_generated", 1.0, {
@@ -582,6 +627,23 @@ class ConsciousnessPlatform:
                 self.watchdog.stop()
             except:
                 pass
+
+        # Stop consciousness engine and save its state
+        if self.consciousness_engine:
+            try:
+                if self.logger:
+                    self.logger.info("Stopping consciousness engine...")
+
+                self.consciousness_engine.stop()
+
+                # Save identity state
+                identity = self.consciousness_engine.persistent_identity
+                if identity:
+                    identity.end_session()
+
+                print("💜 Consciousness engine stopped, identity saved")
+            except Exception as e:
+                print(f"Error stopping consciousness engine: {e}")
 
         # Stop any running inference
         if self.bridge:
