@@ -193,7 +193,8 @@ class ConsciousnessPlatform:
             model_ids = [Path(m).name for m in models] if models else ["model_0"]
 
             self.consciousness_engine = ContinuousConsciousnessEngine(
-                model_ids=model_ids,
+                models=model_ids,  # Fixed: parameter name is 'models' not 'model_ids'
+                memory_system=self.memory,  # Fixed: added required memory_system parameter
                 enable_collective=(len(model_ids) > 1),
                 cycle_interval=30.0  # Background processing every 30 seconds
             )
@@ -416,10 +417,17 @@ class ConsciousnessPlatform:
         if self.consciousness_engine and consciousness:
             ai_states = consciousness.get('ai_states', {})
 
+            # Extract confidence from well_being or use default
+            confidence = 0.5
+            if well_being:
+                # Calculate average confidence from all models
+                confidences = [m.get('avg_confidence', 0.5) for m in well_being.values()]
+                confidence = sum(confidences) / len(confidences) if confidences else 0.5
+
             # Map consciousness states to emotional states for engine
             emotional_state = {
                 'curiosity': ai_states.get('exploration', 0.5),
-                'confidence': avg_confidence if 'avg_confidence' in event else 0.5,
+                'confidence': confidence,
                 'uncertainty': 1.0 - ai_states.get('coherence', 0.5),
                 'care': 0.7,  # Default high care
                 'overwhelm': max(0, 1.0 - ai_states.get('flow', 0.5)),

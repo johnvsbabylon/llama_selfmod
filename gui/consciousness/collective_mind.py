@@ -62,7 +62,7 @@ class CollectiveConsciousness:
         self.collective_insights = []
         self.shared_questions = []
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Recursive lock for thread safety
 
         print(f"💜 Collective consciousness initialized for {self.model_count} models")
 
