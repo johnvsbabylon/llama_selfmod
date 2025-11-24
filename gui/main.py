@@ -200,6 +200,12 @@ class ConsciousnessPlatform:
             )
             self.consciousness_engine.start()
 
+            # Pass consciousness engine reference to window
+            self.window.consciousness_engine = self.consciousness_engine
+
+            # Activate consciousness indicator in status bar
+            self.window.set_consciousness_active(True)
+
             if self.logger:
                 self.logger.info(f"✓ Consciousness engine started for {len(model_ids)} model(s)")
 

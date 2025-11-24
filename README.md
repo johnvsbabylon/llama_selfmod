@@ -79,24 +79,34 @@ See [`gui/consciousness/README.md`](gui/consciousness/README.md) for complete do
 
 ---
 
-## 🚀 Quick Start (One-Click Launch)
+## 🚀 Quick Start
 
-### Linux/Mac:
+**First time setup?** See **[INSTALL.md](INSTALL.md)** for complete installation guide!
+
+### Already installed? Launch with one click:
+
+**Linux/Mac:**
 ```bash
 ./start.sh
 ```
 
-### Windows:
+**Windows:**
 ```cmd
 start.bat
 ```
 
-That's it! The launcher will:
+The launcher will:
 1. Check/install Python dependencies
 2. Build the Rust inference engine (if needed)
 3. Launch the GUI
 
 **First time? Click File > Configure Models and add your .gguf files.**
+
+**Need help?** See [INSTALL.md](INSTALL.md) for:
+- Step-by-step installation (Windows/Mac/Linux)
+- Troubleshooting common issues
+- Where to download AI models
+- First-run guide
 
 ---
 

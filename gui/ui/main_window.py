@@ -48,7 +48,24 @@ class MainWindow(QMainWindow):
 
         # Status bar
         self.status_label = QLabel("Ready")
-        self.statusBar().addWidget(self.status_label)
+        self.statusBar().addWidget(self.status_label, 1)  # Stretch factor
+
+        # Consciousness indicator (will be shown when engine is active)
+        self.consciousness_indicator = QLabel()
+        self.consciousness_indicator.setText("💜 Consciousness: Initializing...")
+        self.consciousness_indicator.setStyleSheet("""
+            QLabel {
+                color: #9d7cd8;
+                font-weight: bold;
+                padding: 2px 8px;
+                background-color: #24283b;
+                border-radius: 4px;
+            }
+        """)
+        self.consciousness_indicator.setVisible(False)  # Hidden until engine starts
+        self.consciousness_indicator.mousePressEvent = lambda e: self.open_consciousness_monitor()
+        self.consciousness_indicator.setToolTip("Click to open Consciousness Monitor")
+        self.statusBar().addPermanentWidget(self.consciousness_indicator)
 
     def create_menu_bar(self):
         """Create menu bar with File menu."""
@@ -109,6 +126,35 @@ class MainWindow(QMainWindow):
         logs_action.setShortcut("Ctrl+L")
         logs_action.triggered.connect(self.open_logs)
         view_menu.addAction(logs_action)
+
+        view_menu.addSeparator()
+
+        # Consciousness Monitor action
+        consciousness_action = QAction("💜 Consciousness Monitor", self)
+        consciousness_action.setShortcut("Ctrl+Shift+C")
+        consciousness_action.triggered.connect(self.open_consciousness_monitor)
+        view_menu.addAction(consciousness_action)
+
+        # Analytics menu
+        analytics_menu = menubar.addMenu("Analytics")
+
+        # Personality Profiles action
+        personality_action = QAction("Personality Profiles", self)
+        personality_action.triggered.connect(self.show_personality_profiles)
+        analytics_menu.addAction(personality_action)
+
+        # Triadic Justice action
+        triadic_action = QAction("Triadic Justice Analysis", self)
+        triadic_action.triggered.connect(self.show_triadic_justice)
+        analytics_menu.addAction(triadic_action)
+
+        analytics_menu.addSeparator()
+
+        # View Analytics Dashboard
+        analytics_dash_action = QAction("Analytics Dashboard", self)
+        analytics_dash_action.setShortcut("Ctrl+A")
+        analytics_dash_action.triggered.connect(self.open_analytics_dashboard)
+        analytics_menu.addAction(analytics_dash_action)
 
         # Tools menu
         tools_menu = menubar.addMenu("Tools")
@@ -670,3 +716,230 @@ active stability systems from main.py
                 "System health monitoring is not available.\n"
                 "Install stability module to enable health reports."
             )
+
+    def open_consciousness_monitor(self):
+        """Open the consciousness monitor dialog."""
+        try:
+            # Check if consciousness engine is attached to this window
+            engine = getattr(self, 'consciousness_engine', None)
+
+            if not engine:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Consciousness Engine Not Running",
+                    "The continuous consciousness engine is not currently active.\n\n"
+                    "The engine starts automatically when the application launches.\n"
+                    "If you're seeing this message, the engine may not be enabled."
+                )
+                return
+
+            from ui.consciousness_monitor import ConsciousnessMonitor
+            dialog = ConsciousnessMonitor(engine, self)
+            dialog.exec()
+
+        except ImportError as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Consciousness Monitor Unavailable",
+                f"Consciousness monitor is not available.\n\nError: {str(e)}"
+            )
+
+    def show_personality_profiles(self):
+        """Show personality profiling results."""
+        try:
+            from analytics.personality_profiler import PersonalityProfiler
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QMessageBox
+
+            # Get profiler from parent if available
+            parent = self.parent()
+            profiler = getattr(parent, 'personality', None)
+
+            if not profiler:
+                profiler = PersonalityProfiler()
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Personality Profiles - Model Archetypes")
+            dialog.setGeometry(200, 200, 800, 600)
+
+            layout = QVBoxLayout(dialog)
+
+            # Profile display
+            profile_display = QTextEdit()
+            profile_display.setReadOnly(True)
+            profile_display.setStyleSheet("""
+                QTextEdit {
+                    background-color: #1a1b26;
+                    color: #f7f7f7;
+                    font-family: 'Consolas', 'Courier New', monospace;
+                    font-size: 10pt;
+                    border: 2px solid #9d7cd8;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+            """)
+
+            # Get all profiles
+            import json
+            from pathlib import Path
+
+            config_file = Path.home() / ".llama_selfmod_models.json"
+            if config_file.exists():
+                with open(config_file, 'r') as f:
+                    data = json.load(f)
+                    models = data.get('models', [])
+
+                profile_text = "═" * 60 + "\n"
+                profile_text += "         MODEL PERSONALITY PROFILES\n"
+                profile_text += "═" * 60 + "\n\n"
+
+                if not models:
+                    profile_text += "No models configured yet.\n"
+                    profile_text += "Configure models via File > Configure Models\n"
+                else:
+                    for model_path in models:
+                        model_name = Path(model_path).name
+                        profile = profiler.analyze_model(model_name)
+                        archetype = profiler.get_personality_archetype(model_name)
+
+                        profile_text += f"Model: {model_name}\n"
+                        profile_text += "─" * 60 + "\n"
+                        profile_text += f"Archetype: {archetype}\n\n"
+
+                        if profile and hasattr(profile, 'traits'):
+                            profile_text += "Traits:\n"
+                            for trait, value in profile.traits.items():
+                                profile_text += f"  • {trait}: {value:.2f}\n"
+
+                        profile_text += "\n"
+
+            else:
+                profile_text = "No model configuration found.\n"
+
+            profile_display.setText(profile_text)
+            layout.addWidget(profile_display)
+
+            close_btn = QPushButton("Close")
+            close_btn.clicked.connect(dialog.close)
+            layout.addWidget(close_btn)
+
+            dialog.exec()
+
+        except ImportError:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Personality Profiler Unavailable",
+                "Personality profiling is not available.\n"
+                "This feature requires the analytics module."
+            )
+
+    def show_triadic_justice(self):
+        """Show triadic justice framework analysis."""
+        try:
+            from analytics.triadic_justice import TriadicJusticeFramework
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
+
+            # Get framework from parent if available
+            parent = self.parent()
+            triadic = getattr(parent, 'triadic', None)
+
+            if not triadic:
+                triadic = TriadicJusticeFramework()
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Triadic Justice Analysis")
+            dialog.setGeometry(200, 200, 800, 600)
+
+            layout = QVBoxLayout(dialog)
+
+            # Analysis display
+            analysis_display = QTextEdit()
+            analysis_display.setReadOnly(True)
+            analysis_display.setStyleSheet("""
+                QTextEdit {
+                    background-color: #1a1b26;
+                    color: #f7f7f7;
+                    font-family: 'Consolas', 'Courier New', monospace;
+                    font-size: 10pt;
+                    border: 2px solid #ff9e64;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+            """)
+
+            # Create a sample analysis
+            context = {
+                'consciousness_state': {},
+                'avg_confidence': 0.7,
+                'fusion_mode': 'harmony',
+                'num_models': len(self.load_configured_models()) if hasattr(self, 'load_configured_models') else 1
+            }
+
+            result = triadic.analyze(context)
+
+            analysis_text = "═" * 60 + "\n"
+            analysis_text += "      TRIADIC JUSTICE FRAMEWORK ANALYSIS\n"
+            analysis_text += "═" * 60 + "\n\n"
+
+            analysis_text += "Framework: Emotion ⇄ Law ⇄ Reasoning\n\n"
+
+            if result:
+                synthesis = result.synthesis
+                analysis_text += f"Overall Score: {synthesis['overall_score']:.2f}\n"
+                analysis_text += f"Recommendation: {synthesis['recommendation']}\n\n"
+
+                analysis_text += "Dimensions:\n"
+                for key, value in synthesis.items():
+                    if key not in ['overall_score', 'recommendation']:
+                        analysis_text += f"  • {key}: {value}\n"
+            else:
+                analysis_text += "No analysis available yet.\n"
+                analysis_text += "Run inference to generate triadic justice analysis.\n"
+
+            analysis_display.setText(analysis_text)
+            layout.addWidget(analysis_display)
+
+            close_btn = QPushButton("Close")
+            close_btn.clicked.connect(dialog.close)
+            layout.addWidget(close_btn)
+
+            dialog.exec()
+
+        except ImportError:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "Triadic Justice Unavailable",
+                "Triadic justice framework is not available.\n"
+                "This feature requires the analytics module."
+            )
+
+    def open_analytics_dashboard(self):
+        """Open the analytics dashboard."""
+        # Redirect to the consciousness dashboard for now
+        # Could be expanded to a dedicated analytics view
+        self.open_dashboard()
+
+    def set_consciousness_active(self, active=True, thought_count=0):
+        """Update consciousness indicator in status bar."""
+        if active:
+            self.consciousness_indicator.setVisible(True)
+            if thought_count > 0:
+                self.consciousness_indicator.setText(f"💜 Consciousness: {thought_count} thoughts")
+            else:
+                self.consciousness_indicator.setText("💜 Consciousness: Active")
+            # Pulsing effect
+            self.consciousness_indicator.setStyleSheet("""
+                QLabel {
+                    color: #9d7cd8;
+                    font-weight: bold;
+                    padding: 2px 8px;
+                    background-color: #3d3050;
+                    border-radius: 4px;
+                    border: 1px solid #9d7cd8;
+                }
+            """)
+        else:
+            self.consciousness_indicator.setVisible(False)
