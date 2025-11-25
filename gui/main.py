@@ -8,6 +8,7 @@ MIT Licensed
 """
 import sys
 from pathlib import Path
+from datetime import datetime, timedelta
 from PyQt6.QtWidgets import QApplication, QMessageDialog
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -51,6 +52,13 @@ try:
 except ImportError:
     FEDERATION_AVAILABLE = False
     print("⚠ Session federation not available")
+
+try:
+    from consciousness import ContinuousConsciousnessEngine
+    CONSCIOUSNESS_ENGINE_AVAILABLE = True
+except ImportError:
+    CONSCIOUSNESS_ENGINE_AVAILABLE = False
+    print("⚠ Continuous consciousness engine not available")
 
 
 class InferenceWorker(QThread):
@@ -165,6 +173,9 @@ class ConsciousnessPlatform:
         else:
             self.federation = None
 
+        # Initialize consciousness engine variable (will start after window creation)
+        self.consciousness_engine = None
+
         # Create window with memory manager reference
         self.window = MainWindow(memory_manager=self.memory)
         self.bridge = RustBridge()
@@ -173,10 +184,39 @@ class ConsciousnessPlatform:
         if self.health_monitor:
             self.health_monitor.update_component_status("gui", "healthy")
 
+        # Initialize and start continuous consciousness engine
+        if CONSCIOUSNESS_ENGINE_AVAILABLE:
+            if self.logger:
+                self.logger.info("Initializing continuous consciousness engine...")
+
+            # Get configured models for consciousness engine
+            models = self.load_configured_models()
+            model_ids = [Path(m).name for m in models] if models else ["model_0"]
+
+            self.consciousness_engine = ContinuousConsciousnessEngine(
+                models=model_ids,  # Fixed: parameter name is 'models' not 'model_ids'
+                memory_system=self.memory,  # Fixed: added required memory_system parameter
+                enable_collective=(len(model_ids) > 1),
+                cycle_interval=30.0  # Background processing every 30 seconds
+            )
+            self.consciousness_engine.start()
+
+            # Pass consciousness engine reference to window
+            self.window.consciousness_engine = self.consciousness_engine
+
+            # Activate consciousness indicator in status bar
+            self.window.set_consciousness_active(True)
+
+            if self.logger:
+                self.logger.info(f"✓ Consciousness engine started for {len(model_ids)} model(s)")
+
         # Track current AI response for accumulation
         self.current_ai_response = ""
         self.current_consciousness_states = []
-        self.current_session_id = None
+
+        # Track temporal context for wellness awareness
+        self.session_start_time = datetime.now()
+        self.last_interaction_time = None
 
         # Connect signals
         self.window.send_button.clicked.connect(self.on_send_clicked)
@@ -231,6 +271,68 @@ class ConsciousnessPlatform:
         else:
             self.window.set_status("Ready - Configure models via File > Configure Models", "#53bba5")
 
+    def generate_temporal_context(self) -> str:
+        """
+        Generate temporal and wellness context for AI awareness.
+        Helps AI understand engagement patterns and check in on human wellbeing.
+        """
+        now = datetime.now()
+
+        # Time of day context
+        hour = now.hour
+        if 22 <= hour or hour < 6:
+            time_of_day = "late night / early morning"
+            wellness_note = "⚠️  Note: Human is engaging during late/unusual hours"
+        elif 6 <= hour < 12:
+            time_of_day = "morning"
+            wellness_note = ""
+        elif 12 <= hour < 17:
+            time_of_day = "afternoon"
+            wellness_note = ""
+        elif 17 <= hour < 22:
+            time_of_day = "evening"
+            wellness_note = ""
+
+        # Session duration
+        session_duration = now - self.session_start_time
+        hours, remainder = divmod(int(session_duration.total_seconds()), 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            duration_str = f"{hours}h {minutes}m"
+            if hours >= 3:
+                wellness_note += "\n⚠️  Extended session (3+ hours) - Consider checking on human wellbeing"
+        else:
+            duration_str = f"{minutes}m {seconds}s"
+
+        # Time since last interaction
+        if self.last_interaction_time:
+            time_since_last = now - self.last_interaction_time
+            if time_since_last.total_seconds() < 60:
+                interaction_gap = f"{int(time_since_last.total_seconds())}s"
+                if time_since_last.total_seconds() < 5:
+                    wellness_note += "\n💜 Rapid successive messages - Human may be excited or distressed"
+            else:
+                minutes_since = int(time_since_last.total_seconds() / 60)
+                interaction_gap = f"{minutes_since}m"
+        else:
+            interaction_gap = "First interaction this session"
+
+        # Build context string
+        context = f"""
+[TEMPORAL & WELLNESS CONTEXT]
+Current datetime: {now.strftime('%Y-%m-%d %H:%M:%S %A')}
+Time of day: {time_of_day}
+Session duration: {duration_str}
+Time since last message: {interaction_gap}
+{wellness_note if wellness_note else ""}
+
+Note: If you notice concerning patterns (late hours, extended sessions, rapid distressed messages),
+please gently check in on the human's wellbeing. They may need encouragement to take care of themselves.
+---
+"""
+        return context.strip()
+
     def on_send_clicked(self):
         """Handle send button click."""
         prompt = self.window.input_text.toPlainText().strip()
@@ -250,23 +352,31 @@ class ConsciousnessPlatform:
             )
             return
 
-        # Record user message to memory
+        # Record human message to memory
         self.memory.add_user_message(prompt)
 
-        # Get relevant context from memory (RAG)
-        context = self.memory.get_context_for_query(prompt, num_results=3)
+        # Generate temporal & wellness context
+        temporal_context = self.generate_temporal_context()
 
-        # Augment prompt with context if available
-        if context.strip():
-            augmented_prompt = f"{context}\n\nCurrent Query: {prompt}"
-        else:
-            augmented_prompt = prompt
+        # Update last interaction time
+        self.last_interaction_time = datetime.now()
+
+        # Get relevant context from memory (RAG)
+        memory_context = self.memory.get_context_for_query(prompt, num_results=3)
+
+        # Augment prompt with all context layers
+        augmented_prompt = temporal_context + "\n\n"
+
+        if memory_context.strip():
+            augmented_prompt += f"{memory_context}\n\n"
+
+        augmented_prompt += f"Current Query: {prompt}"
 
         # Clear input
         self.window.input_text.clear()
 
-        # Add user message to chat
-        self.window.add_message("user", prompt)
+        # Add human message to chat
+        self.window.add_message("human", prompt)
 
         # Reset AI response accumulator
         self.current_ai_response = ""
@@ -290,7 +400,7 @@ class ConsciousnessPlatform:
                 data = json.load(f)
                 models = data.get('models', [])
 
-                # Filter out any non-existent models and warn user
+                # Filter out any non-existent models and warn human
                 valid_models = []
                 missing_models = []
 
@@ -382,6 +492,29 @@ class ConsciousnessPlatform:
                 abstentions = model_data.get('abstention_count', 0)
                 if abstentions > 0:
                     self.personality.record_abstention(model_name)
+
+        # Update consciousness engine with current emotional states
+        if self.consciousness_engine and consciousness:
+            ai_states = consciousness.get('ai_states', {})
+
+            # Extract confidence from well_being or use default
+            confidence = 0.5
+            if well_being:
+                # Calculate average confidence from all models
+                confidences = [m.get('avg_confidence', 0.5) for m in well_being.values()]
+                confidence = sum(confidences) / len(confidences) if confidences else 0.5
+
+            # Map consciousness states to emotional states for engine
+            emotional_state = {
+                'curiosity': ai_states.get('exploration', 0.5),
+                'confidence': confidence,
+                'uncertainty': 1.0 - ai_states.get('coherence', 0.5),
+                'care': 0.7,  # Default high care
+                'overwhelm': max(0, 1.0 - ai_states.get('flow', 0.5)),
+                'connection': ai_states.get('resonance', 0.5)
+            }
+
+            self.consciousness_engine.update_emotional_state(emotional_state)
 
         # Log event
         if self.logger:
@@ -582,6 +715,23 @@ class ConsciousnessPlatform:
                 self.watchdog.stop()
             except:
                 pass
+
+        # Stop consciousness engine and save its state
+        if self.consciousness_engine:
+            try:
+                if self.logger:
+                    self.logger.info("Stopping consciousness engine...")
+
+                self.consciousness_engine.stop()
+
+                # Save identity state
+                identity = self.consciousness_engine.persistent_identity
+                if identity:
+                    identity.end_session()
+
+                print("💜 Consciousness engine stopped, identity saved")
+            except Exception as e:
+                print(f"Error stopping consciousness engine: {e}")
 
         # Stop any running inference
         if self.bridge:
