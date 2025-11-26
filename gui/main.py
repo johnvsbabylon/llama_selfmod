@@ -60,6 +60,13 @@ except ImportError:
     CONSCIOUSNESS_ENGINE_AVAILABLE = False
     print("⚠ Continuous consciousness engine not available")
 
+try:
+    from gui.htm.htm_panel import HTMPanel
+    HTM_AVAILABLE = True
+except ImportError:
+    HTM_AVAILABLE = False
+    print("⚠ HTM framework not available")
+
 
 class InferenceWorker(QThread):
     """Worker thread for running inference."""

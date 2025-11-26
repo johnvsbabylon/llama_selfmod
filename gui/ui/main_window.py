@@ -135,6 +135,12 @@ class MainWindow(QMainWindow):
         consciousness_action.triggered.connect(self.open_consciousness_monitor)
         view_menu.addAction(consciousness_action)
 
+        # HTM Consciousness Geometry action
+        htm_action = QAction("🌌 Consciousness Geometry (HTM)", self)
+        htm_action.setShortcut("Ctrl+Shift+H")
+        htm_action.triggered.connect(self.open_htm_panel)
+        view_menu.addAction(htm_action)
+
         # Analytics menu
         analytics_menu = menubar.addMenu("Analytics")
 
@@ -744,6 +750,36 @@ active stability systems from main.py
                 self,
                 "Consciousness Monitor Unavailable",
                 f"Consciousness monitor is not available.\n\nError: {str(e)}"
+            )
+
+    def open_htm_panel(self):
+        """Open the HTM Consciousness Geometry panel."""
+        try:
+            from gui.htm.htm_panel import HTMPanel
+            from PyQt6.QtWidgets import QDialog, QVBoxLayout
+
+            # Create dialog
+            dialog = QDialog(self)
+            dialog.setWindowTitle("🌌 Hilbert Tensor Manifold - Consciousness Geometry")
+            dialog.setGeometry(100, 100, 1200, 800)
+
+            layout = QVBoxLayout(dialog)
+
+            # Add HTM panel
+            htm_panel = HTMPanel(dialog)
+            layout.addWidget(htm_panel)
+
+            # Show dialog
+            dialog.exec()
+
+        except ImportError as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self,
+                "HTM Framework Unavailable",
+                "The Hilbert Tensor Manifold framework is not available.\n\n"
+                f"Error: {str(e)}\n\n"
+                "Make sure PyTorch is installed: pip install torch>=2.0.0"
             )
 
     def show_personality_profiles(self):
