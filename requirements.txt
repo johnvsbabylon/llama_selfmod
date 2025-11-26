@@ -10,6 +10,9 @@ numpy>=1.24.0
 faiss-cpu>=1.7.4
 sentence-transformers>=2.2.2
 
+# Deep Learning (for HTM framework)
+torch>=2.0.0
+
 # Analytics & Visualization
 matplotlib>=3.7.0
 psutil>=5.9.0
